@@ -1,28 +1,29 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=4b1a93a9';
-import {FluidRenderer} from '../render.mjs?v=4b1a93a9';
-import {sampleGlyphs} from '../glyphs.mjs?v=4b1a93a9';
-import {restrain,sagWeight} from './coupling.mjs?v=4b1a93a9';
+import {Fluid} from '../physics.mjs?v=5104613e';
+import {FluidRenderer} from '../render.mjs?v=5104613e';
+import {sampleGlyphs} from '../glyphs.mjs?v=5104613e';
+import {restrain,sagWeight} from './coupling.mjs?v=5104613e';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
 const letters=[...initials.querySelectorAll('.initial')];
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
-// Impulse strength, attraction and viscosity at the maximum of the main page's sliders.
-const parameters={viscosity:1,tension:.65,attraction:1,strength:2.1,gravityX:0,gravityY:0,dripGravity:1400};
+// The sweet spot: heavy and cohesive, but still alive. Viscosity below
+// honey so waves, drips and bursts settle within a couple of seconds.
+const parameters={viscosity:.55,tension:.7,attraction:.85,strength:1.8,gravityX:0,gravityY:0,dripGravity:1400};
 const pointer={x:0,y:0,down:false,radius:80,id:null,last:0,startX:0,startY:0,dragged:false};
 // Every effect's dials. Adjustable live from the tuning panel (bottom left)
 // and remembered in this browser; `defaults` restores them.
 const defaults={
  // Idle: after this quiet time an invisible hand drifts around the initials.
- idleDelay:5000,idleForce:1.6,
+ idleDelay:4000,idleForce:1.4,
  // Letters condense from a cloud this wide (share of the shorter canvas
  // side); while condensing the liquid flows thin for assembleMs.
- assembleSpread:.2,assembleMs:2600,
+ assembleSpread:.22,assembleMs:2200,
  // Holding gathers the liquid, then it bursts; the spring lets go briefly.
- holdMs:480,burstSpeed:1100,burstFreeMs:260,
+ holdMs:450,burstSpeed:1200,burstFreeMs:300,
  // Drops detach from the lowest edge every few quiet seconds.
- dripMin:5000,dripMax:9000,dripFallMs:1300,dripSize:2.3,
+ dripMin:6000,dripMax:11000,dripFallMs:1300,dripSize:2.3,
  // A hovering mouse between M and S draws the liquid of both toward it.
  magnetStrength:2.2,magnetRadius:.26,
  // The home line: resting liquid bends it, landing drops kick it.
@@ -32,7 +33,7 @@ const defaults={
  shakeGain:650,tiltGain:90,leanGain:120,
  // Flight between initials and headings: duration, viscosity and how much
  // harder the liquid is pulled to its target so it stands still at hand-over.
- morphMs:1000,morphViscosity:.85,morphHoming:3,
+ morphMs:1100,morphViscosity:.7,morphHoming:3,
  // Text grid: invisible strings every gridSpacing letter sizes that the
  // letters ride; their swing (stiffness, damping) and how hard scrolling
  // plucks them.
@@ -47,7 +48,17 @@ const tune={...defaults};
 const CALM_SPEED=25,LINE_LOAD_MAX=600,LINE_KICK_MAX=400;
 let renderer=null,fluid=null,w=0,h=0,last=0,accumulator=0,layoutKey='',rebuildTimer=0;
 let idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null,homeLine=null,lineLoad=0,lineKick=0;
-let holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+tune.dripMin,gap=null,magnetOn=false,settleUntil=0,letterSize=200;
+let holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+tune.dripMin,gap=null,magnetOn=false,letterSize=200;
+// A settling phase blends extra parameters in for a moment and fades them
+// out toward the end, e.g. thin flow while the letters assemble or a
+// stronger pull home after a burst, without a jolt when it ends.
+const settle={until:0,duration:0,extra:null};
+function settleFor(ms,extra){settle.until=performance.now()+ms;settle.duration=ms;settle.extra=extra;}
+function settling(t){
+ const k=Math.min(1,(settle.until-t)/Math.max(1,settle.duration)*1.6);
+ const out={...parameters};for(const key in settle.extra)out[key]=parameters[key]===undefined?1+(settle.extra[key]-1)*k:parameters[key]+(settle.extra[key]-parameters[key])*k;
+ return out;
+}
 const magnet={x:0,y:0,down:true,radius:0};
 const darkScheme=matchMedia('(prefers-color-scheme: dark)');
 const isHome=()=>home.classList.contains('is-active');
@@ -128,7 +139,7 @@ function scatter(){
   const a=Math.random()*Math.PI*2,d=r*Math.sqrt(Math.random());
   fluid.x[i]=clampX(fluid.tx[i]+Math.cos(a)*d);fluid.y[i]=clampY(fluid.ty[i]+Math.sin(a)*d);fluid.vx[i]=fluid.vy[i]=0;
  }
- idleSince=performance.now();settleUntil=idleSince+tune.assembleMs;
+ idleSince=performance.now();settleFor(tune.assembleMs,{viscosity:.3,attraction:.5,homing:2});
 }
 // Everything flies away from the press point; the spring lets go for a moment.
 function burst(x,y){
@@ -142,6 +153,7 @@ function burst(x,y){
  }
  if(!reducedMotion.matches){fluid.free.fill(1);burstUntil=now+tune.burstFreeMs;drip=null;}
  pointer.down=false;pointer.dragged=true;suppressClickUntil=now+600;idleSince=now;
+ settleFor(tune.burstFreeMs+2600,{homing:2.5});
  try{navigator.vibrate?.(20);}catch{/* optional */}
 }
 function calm(){let sum=0,count=0;for(let i=0;i<fluid.n;i+=37){sum+=Math.hypot(fluid.vx[i],fluid.vy[i]);count++;}return count===0||sum/count<CALM_SPEED;}
@@ -232,7 +244,7 @@ function frame(t){
   const line=shape&&{top:shape.top-box.top,width:shape.width,anchor:shape.anchor,offset:shape.offset,rate:shape.rate,shift:box.left};
   magnet.radius=letterSize*tune.magnetRadius;
   const brush=pointer.down?pointer:magnetOn&&!reducedMotion.matches?magnet:null;
-  const prm=brush===magnet?{...parameters,strength:tune.magnetStrength}:t<settleUntil?{...parameters,viscosity:.3,attraction:.5,homing:2}:parameters;
+  const prm=brush===magnet?{...parameters,strength:tune.magnetStrength}:t<settle.until?settling(t):parameters;
   while(accumulator>=1/120){
    fluid.step(1/120,prm,brush);
    if(line){const hit=restrain(fluid,line);lineLoad=hit.load;lineKick+=Math.min(LINE_KICK_MAX,hit.impact*tune.lineImpactGain);}
@@ -546,7 +558,10 @@ function buildTune(){
  document.addEventListener('pointerdown',e=>{if(panel.classList.contains('is-open')&&!e.target.closest('.tune, .tune-toggle'))openTune(false);});
  window.addEventListener('keydown',e=>{if(e.key==='Escape'&&panel.classList.contains('is-open')){e.stopImmediatePropagation();openTune(false);}},true);
 }
-loadTune();buildTune();
+// The panel and remembered values only appear on request (?tune or ?debug);
+// every other visit gets the defaults above.
+const tuning=['tune','debug'].some(k=>new URLSearchParams(location.search).has(k));
+if(tuning){loadTune();buildTune();}else{$('tuneToggle')?.remove();$('tune')?.remove();}
 
 // ------------------------------------------------------------- text grid ---
 // Invisible horizontal strings across the whole page, one every few letter
