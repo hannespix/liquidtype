@@ -1,8 +1,8 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=7c4c6ec6';
-import {FluidRenderer} from '../render.mjs?v=7c4c6ec6';
-import {sampleGlyphs} from '../glyphs.mjs?v=7c4c6ec6';
-import {restrain} from './coupling.mjs?v=7c4c6ec6';
+import {Fluid} from '../physics.mjs?v=c9b3dccc';
+import {FluidRenderer} from '../render.mjs?v=c9b3dccc';
+import {sampleGlyphs} from '../glyphs.mjs?v=c9b3dccc';
+import {restrain} from './coupling.mjs?v=c9b3dccc';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -48,7 +48,7 @@ function createRenderer(){
 }
 // Where the (transparent) DOM letters sit, relative to the canvas.
 function glyphLayout(){
- const box=home.getBoundingClientRect();
+ const box=canvas.getBoundingClientRect();
  return letters.map(el=>{
   const r=el.getBoundingClientRect(),cs=getComputedStyle(el);
   return {char:el.textContent.trim(),x:r.left-box.left,y:r.top-box.top,width:r.width,height:r.height,size:parseFloat(cs.fontSize),font:`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`};
@@ -90,7 +90,7 @@ function rebuild(force=false){
  ghost=null;draw();
 }
 function fitCanvas(){
- const box=home.getBoundingClientRect(),nw=Math.round(box.width),nh=Math.round(box.height);
+ const box=canvas.getBoundingClientRect(),nw=Math.round(box.width),nh=Math.round(box.height);
  if(nw<2||nh<2)return false;
  if(nw!==w||nh!==h){w=nw;h=nh;renderer.resize(w,h);}
  return true;
@@ -138,7 +138,7 @@ function effects(t){
 }
 function scheduleRebuild(){clearTimeout(rebuildTimer);rebuildTimer=setTimeout(()=>rebuild(),120);}
 function draw(){if(renderer&&fluid)renderer.draw(fluid,dropSpacingNow(performance.now()));}
-function local(e){const r=home.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
+function local(e){const r=canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
 function disturb(x,y,dx,dy,radius){if(fluid&&Math.abs(dx)+Math.abs(dy)>=.1)fluid.impulse(x,y,dx,dy,radius);}
 
 home.addEventListener('pointerdown',e=>{
@@ -190,10 +190,10 @@ function idleMotion(t){
 }
 function frame(t){
  requestAnimationFrame(frame);
- if(document.hidden||!isHome()){last=0;return;}
+ if(document.hidden||(!isHome()&&!transition)){last=0;return;}
  const dt=last?Math.min(.04,(t-last)/1000):0;last=t;
  // The home line runs on the same clock as the liquid, so both can push each other.
- homeLine?.step(dt,Math.min(LINE_LOAD_MAX,lineLoad)*LINE_LOAD_GAIN,lineKick);lineKick=0;
+ if(isHome()){homeLine?.step(dt,Math.min(LINE_LOAD_MAX,lineLoad)*LINE_LOAD_GAIN,lineKick);lineKick=0;}
  if(!fluid||!renderer)return;
  settleMotion(t);
  accumulator=Math.min(.04,accumulator+dt);
@@ -206,7 +206,7 @@ function frame(t){
  }
  idleMotion(t);effects(t);
  if(accumulator>=1/120){
-  const box=home.getBoundingClientRect(),shape=homeLine?.shape();
+  const box=canvas.getBoundingClientRect(),shape=homeLine?.shape();
   const line=shape&&{top:shape.top-box.top,width:shape.width,anchor:shape.anchor,offset:shape.offset,rate:shape.rate,shift:box.left};
   const brush=pointer.down?pointer:magnetOn&&!reducedMotion.matches?magnet:null;
   const prm=brush===magnet?{...parameters,strength:MAGNET_STRENGTH}:t<settleUntil?{...parameters,viscosity:.3,attraction:.5}:parameters;
@@ -221,7 +221,7 @@ function frame(t){
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();renderer=null;fluid=null;home.classList.add('no-liquid');});
 canvas.addEventListener('webglcontextrestored',()=>{createRenderer();rebuild(true);});
 darkScheme.addEventListener('change',()=>{const c=colors();renderer?.setColors(c.paper,c.ink);draw();});
-new ResizeObserver(scheduleRebuild).observe(home);
+new ResizeObserver(scheduleRebuild).observe(document.getElementById('views'));
 new ResizeObserver(scheduleRebuild).observe(initials);
 document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;release({pointerId:pointer.id});resetMotion();});
 
@@ -302,21 +302,49 @@ function chrome(name){
  back.hidden=name==='home';crumb.textContent=label;
  document.title=name==='home'?baseTitle:`${label} — Matthias Sütterlin`;
 }
-const canMorph=()=>!!renderer&&!!fluid?.n&&!reducedMotion.matches&&!home.classList.contains('no-liquid');
-// A displayed view's single-line heading as a drawing in page coordinates,
-// which equal the home canvas coordinates; null when wrapped or not laid out.
+const canMorph=()=>!!renderer&&!reducedMotion.matches&&!home.classList.contains('no-liquid');
+// A displayed view's heading as a drawing in page coordinates, which equal
+// the liquid canvas coordinates. Every word is placed where the browser laid
+// it out, so wrapped headings match line for line; null when not laid out.
 function headingShape(view){
  const h2=view.querySelector('h2');if(!h2)return null;
- const r=h2.getBoundingClientRect(),cs=getComputedStyle(h2),size=parseFloat(cs.fontSize);
- if(r.width<2||r.height>size*1.4)return null;
- const text=h2.textContent.trim(),font=`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,spacing=cs.letterSpacing;
- const x=r.left+scrollX,top=r.top+scrollY,height=r.height;
+ const cs=getComputedStyle(h2),font=`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,spacing=cs.letterSpacing;
+ const words=[],walker=document.createTreeWalker(h2,NodeFilter.SHOW_TEXT);
+ for(let node=walker.nextNode();node;node=walker.nextNode()){
+  for(const m of node.data.matchAll(/\S+/g)){
+   const range=document.createRange();range.setStart(node,m.index);range.setEnd(node,m.index+m[0].length);
+   const r=range.getBoundingClientRect();
+   if(r.width>0&&r.height>0)words.push({text:m[0],x:r.left+scrollX,top:r.top+scrollY,height:r.height});
+  }
+ }
+ if(!words.length)return null;
  return {draw(g){
   g.font=font;if('letterSpacing' in g)g.letterSpacing=spacing;g.fillStyle='black';g.textAlign='left';g.textBaseline='alphabetic';
-  const m=g.measureText('M'),asc=m.fontBoundingBoxAscent,desc=m.fontBoundingBoxDescent;
-  const baseline=Number.isFinite(asc)&&Number.isFinite(desc)?top+(height-asc-desc)/2+asc:top+height*.78;
-  g.fillText(text,x,baseline);
+  const m=g.measureText('M'),asc=m.fontBoundingBoxAscent,desc=m.fontBoundingBoxDescent,metric=Number.isFinite(asc)&&Number.isFinite(desc);
+  for(const word of words)g.fillText(word.text,word.x,metric?word.top+(word.height-asc-desc)/2+asc:word.top+word.height*.78);
  }};
+}
+const canvasOn=on=>{canvas.classList.toggle('is-off',!on);};
+// Overlay the target view with its heading hidden, measure the heading.
+function stage(view){
+ view.hidden=false;view.classList.add('is-active','is-arriving');
+ const shape=headingShape(view);
+ if(!shape){unstage(view);return null;}
+ return shape;
+}
+function unstage(view){view.hidden=true;view.classList.remove('is-active','is-arriving');}
+// Shared tail of every morph into a non-home view: reveal, fade, hand over.
+function handOver(fromView,view,focus){
+ const t={finish(){
+  for(const id of t.timers)clearTimeout(id);
+  fromView.hidden=true;fromView.classList.remove('is-active','is-leaving');
+  view.classList.remove('is-arriving','is-revealed');canvas.classList.remove('is-fading');canvasOn(false);
+  transition=null;layoutKey='';
+  if(focus)view.querySelector('h2')?.focus({preventScroll:true});
+ }};
+ startTransition(t,MORPH_MS+FADE_MS);
+ t.timers.push(setTimeout(()=>{if(transition===t){view.classList.add('is-revealed');canvas.classList.add('is-fading');}},MORPH_MS));
+ return t;
 }
 function startTransition(t,ms){t.start=performance.now();t.timers=[];transition=t;t.timers.push(setTimeout(()=>{if(transition===t)t.finish();},ms));}
 function dropSpacingNow(t){
@@ -324,27 +352,40 @@ function dropSpacingNow(t){
  const k=Math.min(1,(t-transition.start)/MORPH_MS),e=k*k*(3-2*k);
  return transition.dropFrom+(transition.dropTo-transition.dropFrom)*e;
 }
+// Home to a section: the initials, in whatever state they are, dissolve
+// into the section's heading.
 function morphForward(name,focus){
- const view=views.get(name);
- view.hidden=false;view.classList.add('is-active','is-arriving');
- const shape=headingShape(view);
- if(!shape){view.hidden=true;view.classList.remove('is-active','is-arriving');return false;}
+ if(!fluid?.n)return false;
+ const view=views.get(name),shape=stage(view);
+ if(!shape)return false;
+ const old=fluid,sample=sampleGlyphs(w,h,g=>shape.draw(g),Math.max(1200,old.n));
+ if(!sample.points.length){unstage(view);return false;}
  current=name;chrome(name);window.scrollTo(0,0);
  home.classList.add('is-leaving');release({pointerId:pointer.id});magnetOn=false;drip=null;burstUntil=0;
- const old=fluid,sample=sampleGlyphs(w,h,g=>shape.draw(g),Math.max(1200,old.n));
- if(!sample.points.length){view.hidden=true;view.classList.remove('is-active','is-arriving');home.classList.remove('is-leaving');return false;}
  renderer.setMaterial(sample.material);
  fluid=new Fluid(sample.points,w,h,sample.spacing);
  for(let i=0;i<fluid.n;i++){const j=Math.min(old.n-1,Math.floor(i*old.n/fluid.n));fluid.x[i]=old.x[j];fluid.y[i]=old.y[j];fluid.vx[i]=old.vx[j]*.3;fluid.vy[i]=old.vy[j]*.3;}
- const t={dropFrom:old.spacing,dropTo:fluid.spacing,finish(){
-  for(const id of t.timers)clearTimeout(id);
-  home.hidden=true;home.classList.remove('is-active','is-leaving');
-  view.classList.remove('is-arriving','is-revealed');canvas.classList.remove('is-fading');
-  transition=null;layoutKey='';
-  if(focus)view.querySelector('h2')?.focus({preventScroll:true});
- }};
- startTransition(t,MORPH_MS+FADE_MS);
- t.timers.push(setTimeout(()=>{if(transition===t){view.classList.add('is-revealed');canvas.classList.add('is-fading');}},MORPH_MS));
+ Object.assign(handOver(home,view,focus),{dropFrom:old.spacing,dropTo:fluid.spacing});
+ return true;
+}
+// Section to section, including project pages: the current heading flows
+// into the next one. Both are sampled at heading density.
+function morphBetween(from,name,focus){
+ const fromView=views.get(from),src=headingShape(fromView);
+ if(!src)return false;
+ const view=views.get(name),dst=stage(view);
+ if(!dst)return false;
+ canvasOn(true);
+ if(!fitCanvas()){unstage(view);canvasOn(false);return false;}
+ const a=sampleGlyphs(w,h,g=>src.draw(g),2600),b=sampleGlyphs(w,h,g=>dst.draw(g),2600);
+ if(!a.points.length||!b.points.length){unstage(view);canvasOn(false);return false;}
+ current=name;chrome(name);window.scrollTo(0,0);
+ fromView.classList.add('is-leaving');
+ renderer.setMaterial(b.material);
+ fluid=new Fluid(b.points,w,h,b.spacing);
+ for(let i=0;i<fluid.n;i++){const p=a.points[Math.floor(i*a.points.length/fluid.n)];fluid.x[i]=p.x;fluid.y[i]=p.y;}
+ Object.assign(handOver(fromView,view,focus),{dropFrom:a.spacing,dropTo:b.spacing});
+ draw();
  return true;
 }
 // Returning home: a liquid of the heading's own density starts as the
@@ -367,6 +408,7 @@ function show(name,focus=true){
  if(name===current)return;
  transition?.finish();
  const from=current;
+ if(canMorph()&&from&&from!=='home'&&name!=='home'&&morphBetween(from,name,focus))return;
  if(canMorph()&&from==='home'&&name!=='home'&&morphForward(name,focus))return;
  homeEntry=canMorph()&&name==='home'&&from&&from!=='home'?headingShape(views.get(from)):null;
  plainShow(name,focus);
@@ -374,7 +416,7 @@ function show(name,focus=true){
 function plainShow(name,focus){
  current=name;
  for(const [key,view] of views){const on=key===name;view.hidden=!on;view.classList.toggle('is-active',on);}
- chrome(name);window.scrollTo(0,0);
+ chrome(name);window.scrollTo(0,0);canvasOn(name==='home');
  if(name==='home'){
   release({pointerId:pointer.id});last=0;idleSince=performance.now();resetMotion();
   const entry=homeEntry;homeEntry=null;

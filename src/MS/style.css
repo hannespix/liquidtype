@@ -29,7 +29,7 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 
 /* Views */
 #views{position:relative}
-.view{min-height:100vh;min-height:100dvh;padding:clamp(4rem,10vw,7rem) clamp(1.25rem,6vw,5rem);display:none}
+.view{position:relative;z-index:1;min-height:100vh;min-height:100dvh;padding:clamp(4rem,10vw,7rem) clamp(1.25rem,6vw,5rem);display:none}
 .view.is-active{display:flex;align-items:center;justify-content:center;animation:enter .45s var(--ease)}
 @keyframes enter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 /* Liquid hand-over: the target view lies over the home view while the
@@ -40,12 +40,16 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .view.is-arriving.is-revealed .panel h2{visibility:visible}
 .view.is-arriving.is-revealed .panel>:not(h2){opacity:1}
 .view-home.is-leaving .home,.view-home.is-leaving .credit{opacity:0;transition:opacity .25s}
+.view.is-leaving .panel h2{visibility:hidden}
+.view.is-leaving .panel>:not(h2){opacity:0;transition:opacity .25s}
 .liquid{transition:opacity .35s var(--ease)}
 .liquid.is-fading{opacity:0}
 
 /* Home with liquid initials */
-.view-home{position:relative;overflow:clip;min-height:100svh}
+.view-home{overflow:clip;min-height:100svh}
+/* One liquid layer under every view, so headings can flow into each other. */
 .liquid{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:0}
+.liquid.is-off{display:none}
 .home{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;text-align:center;max-width:100%}
 .initials{margin:0;display:flex;justify-content:center;gap:.1em;font:700 clamp(7rem,40vw,22rem)/.82 var(--serif);touch-action:none;-webkit-user-select:none;user-select:none}
 .initial{display:block;font:inherit;line-height:inherit;color:transparent;cursor:pointer}
