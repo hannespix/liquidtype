@@ -64,6 +64,9 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .hint .link{margin-left:.3em;opacity:1}
 .hint .link[hidden]{display:none}
 
+/* Letters split into spans so they can ride the invisible text grid */
+.gw{white-space:nowrap}
+.gc{display:inline-block}
 /* Pluckable lines */
 .line{position:relative;height:1px;margin:1.25rem 0 1.75rem}
 .line svg{position:absolute;left:0;top:-200px;width:100vw;height:400px;overflow:visible;pointer-events:none}
