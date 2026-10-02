@@ -176,7 +176,7 @@ function local(e){const r=canvas.getBoundingClientRect();return {x:e.clientX-r.l
 function disturb(x,y,dx,dy,radius){if(fluid&&Math.abs(dx)+Math.abs(dy)>=.1)fluid.impulse(x,y,dx,dy,radius);}
 
 home.addEventListener('pointerdown',e=>{
- if(!fluid||transition||pointer.id!==null||e.button>0||e.target.closest('a, .link, .line-hit'))return;
+ if(!fluid||transition||pointer.id!==null||e.button>0||e.target.closest('a, .link, .line-hit, .motion-pill'))return;
  const p=local(e);
  Object.assign(pointer,{x:p.x,y:p.y,startX:e.clientX,startY:e.clientY,down:true,id:e.pointerId,last:performance.now(),dragged:false});
  idleSince=performance.now();magnetOn=false;

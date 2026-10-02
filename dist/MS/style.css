@@ -61,8 +61,10 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .and{opacity:.4}
 .home .line{margin:.6rem 0 0}
 .hint{margin:2.5rem 0 0;font-size:14px;letter-spacing:.06em;opacity:.45}
-.hint .link{margin-left:.3em;opacity:1}
-.hint .link[hidden]{display:none}
+.motion-pill{display:inline-flex;align-items:center;gap:.5rem;margin:1.75rem auto 0;padding:.6rem 1.05rem;border:1px solid color-mix(in srgb,var(--ink) 14%,transparent);border-radius:999px;font-size:13px;letter-spacing:.04em;color:color-mix(in srgb,var(--ink) 70%,transparent);transition:background .2s,color .2s}
+.motion-pill:hover,.motion-pill:active{background:color-mix(in srgb,var(--ink) 6%,transparent);color:var(--ink)}
+.motion-pill[hidden]{display:none}
+.motion-pill svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.2;stroke-linecap:round}
 
 /* Letters split into spans so they can ride the invisible text grid */
 .gw{white-space:nowrap}
