@@ -59,6 +59,11 @@ Unter `/MS/` liegt eine Studie der Website von Matthias Sütterlin (Innenarchite
 - Die zupfbare Linie unter der Tagline ist eine echte Grenze für die Flüssigkeit: Nach oben gezogen hebt sie die Buchstabenböden an, nach dem Loslassen schwingt sie durch die Schrift. Flüssigkeit, die nach unten gezogen wird, sammelt sich auf der Linie und drückt sie durch.
 - Am Smartphone reagieren die Buchstaben auf Beschleunigungen: Schütteln und schnelles Kippen schwappen durch die Flüssigkeit, eine ruhig gehaltene Schräglage bewirkt nichts Bleibendes. Android liefert Daten sofort, iOS erst nach einem Tipp auf „Bewegung einschalten“. Der Knopf meldet nach kurzer Zeit, wenn der Browser keine Bewegungsdaten liefert. Mit `?debug` an der Adresse erscheint eine Anzeige der Sensorwerte.
 - Der Build stempelt alle lokalen Skript- und Stylesheet-Verweise in `dist/` mit einer Versionskennung, damit ein Browser nach einem Deploy keine alten Module aus dem Cache mit einer neuen Seite mischt.
+- Beim Laden und beim Zurückkommen setzen sich die Initialen aus verstreuten Tropfen zusammen.
+- Gedrückt halten sammelt die Flüssigkeit am Finger und lässt sie dann platzen; sie findet von selbst wieder zusammen.
+- Alle paar ruhigen Sekunden löst sich ein Tropfen vom unteren Rand, fällt auf die Linie und lässt sie nachschwingen.
+- Ein Mauszeiger zwischen M und S zieht die Flüssigkeit beider Buchstaben zu sich, bis eine Tropfenkette entsteht.
+- Dunkler Modus nach Systemeinstellung: helle Flüssigkeit auf Schwarz.
 - Ohne WebGL2 erscheinen die Initialen als normale Schrift.
 
 ## Technische Grenzen

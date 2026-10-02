@@ -14,8 +14,8 @@ test('a line pushes liquid above itself, lifts it with its own speed and counts 
  const f=new Fluid([{x:500,y:100},{x:500,y:180},{x:100,y:180}],1000,400,6);
  f.vy[1]=50;
  // Line at rest height 200, pulled up by 40 px in the middle: peak at y=160.
- const load=restrain(f,{top:200,width:1000,anchor:.5,offset:-40,rate:-300});
- assert.equal(load,1);
+ const {load,impact}=restrain(f,{top:200,width:1000,anchor:.5,offset:-40,rate:-300});
+ assert.equal(load,1);assert.ok(Math.abs(impact-350)<1e-6,'approach speed relative to the rising line, full weight at the peak');
  assert.equal(f.y[0],100);assert.equal(f.vy[0],0);
  assert.equal(f.y[1],160);assert.ok(f.vy[1]<=-300,'carried upward with the line');
  assert.ok(Math.abs(f.y[2]-180)<1e-9,'near the ends the line hardly moves');
@@ -23,6 +23,6 @@ test('a line pushes liquid above itself, lifts it with its own speed and counts 
 test('liquid dragged below a resting line pools on it and keeps flowing sideways',()=>{
  const f=new Fluid([{x:400,y:150}],1000,400,6);
  f.y[0]=260;f.vx[0]=120;f.vy[0]=400;
- const load=restrain(f,{top:200,width:1000,anchor:.5,offset:0,rate:0});
- assert.equal(load,1);assert.equal(f.y[0],200);assert.equal(f.vx[0],120);assert.ok(f.vy[0]<0&&f.vy[0]>-100,'gentle rebound');
+ const {load,impact}=restrain(f,{top:200,width:1000,anchor:.5,offset:0,rate:0});
+ assert.equal(load,1);assert.ok(impact>300&&impact<400,'a falling drop hits with its speed, scaled by where it lands');assert.equal(f.y[0],200);assert.equal(f.vx[0],120);assert.ok(f.vy[0]<0&&f.vy[0]>-100,'gentle rebound');
 });

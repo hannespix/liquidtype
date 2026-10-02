@@ -42,3 +42,13 @@ test('nudge adds a bounded, slightly varied velocity to every particle',()=>{
  assert.notEqual(f.vx[0],f.vx[1]);
  f.nudge(5000,5000);assert.ok(Math.abs(f.vx[0])<=1500&&Math.abs(f.vy[0])<=1500);
 });
+test('a released particle falls under drip gravity, neighbours stay, capture brings it back',()=>{
+ const f=new Fluid([{x:200,y:200},{x:206,y:200}],800,500,6);
+ f.free[0]=1;
+ for(let i=0;i<60;i++)f.step(1/120,{...params,dripGravity:1500});
+ assert.ok(f.y[0]>300,'fell');assert.ok(Math.abs(f.y[1]-200)<3,'neighbour held by its spring');
+ f.free[0]=0;
+ for(let i=0;i<900;i++)f.step(1/120,{...params,dripGravity:1500});
+ assert.ok(Math.abs(f.y[0]-200)<1,'returned');
+ f.free[0]=1;f.reset();assert.equal(f.free[0],0);
+});
