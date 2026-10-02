@@ -16,6 +16,9 @@ const LINE_LOAD_GAIN=40,LINE_LOAD_MAX=600;
 let renderer=null,fluid=null,w=0,h=0,last=0,accumulator=0,layoutKey='',rebuildTimer=0;
 let idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null,homeLine=null,lineLoad=0;
 const isHome=()=>home.classList.contains('is-active');
+function setHint(note){
+ hintText.textContent=note||(motion.active?'Antippen öffnet. Ziehen, Neigen oder Schütteln bewegt.':'Antippen öffnet. Ziehen bewegt.');
+}
 
 // ---------------------------------------------------------------- liquid ---
 function createRenderer(){
@@ -134,46 +137,64 @@ new ResizeObserver(scheduleRebuild).observe(initials);
 document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;release({pointerId:pointer.id});resetMotion();});
 
 // ----------------------------------------------------------------- motion ---
-// Phone sensors. Tilting away from the current holding pose lets the liquid
-// flow, shaking sends waves through it. Gains are px/s² per m/s² of device
-// acceleration; the pose relaxes within a few seconds so a new way of
-// holding the phone becomes neutral again.
-const TILT_GAIN=500,SHAKE_GAIN=700,FORCE_LIMIT=14000,POSE_RELAX=4,SENSOR_TIMEOUT=250;
-const motion={active:false,gravity:null,pose:null,last:0};
+// Phone sensors. Only changes count: a shake or a quick tilt sends the liquid
+// off; holding the phone still in any position does nothing lasting. Device
+// acceleration (m/s²) becomes liquid velocity (px/s): SHAKE_GAIN integrates
+// linear acceleration (px per metre), TILT_GAIN scales the change of the
+// gravity direction per event, LEAN_GAIN is a faint force toward the tilt
+// that relaxes within LEAN_RELAX seconds.
+const SHAKE_GAIN=650,TILT_GAIN=90,LEAN_GAIN=120,LEAN_RELAX=2,NUDGE_LIMIT=260,SENSOR_TIMEOUT=300,SENSOR_WAIT=2500;
+const motion={active:false,gravity:null,pose:null,last:0,events:0,waiting:0};
+const debug=new URLSearchParams(location.search).has('debug')?Object.assign(document.body.appendChild(document.createElement('pre')),{className:'debug'}):null;
 // Device frame (x right, y up in portrait) to canvas frame (x right, y down)
 // as the direction the liquid moves: opposite to the device's own acceleration.
 function liquidDirection(x,y){
  const angle=(screen.orientation?.angle??window.orientation??0)*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
  return {x:-(x*c-y*s),y:x*s+y*c};
 }
+const clampNudge=v=>Math.max(-NUDGE_LIMIT,Math.min(NUDGE_LIMIT,v));
 function onMotion(e){
  const g=e.accelerationIncludingGravity;
  if(!g||g.x==null||g.y==null)return;
- const now=performance.now(),dt=motion.last?Math.min(.1,(now-motion.last)/1000):0;motion.last=now;
- if(!motion.active){motion.active=true;motionButton.hidden=true;hintText.textContent='Antippen öffnet. Ziehen, Neigen oder Schütteln bewegt.';}
+ const now=performance.now(),dt=motion.last?Math.min(.1,(now-motion.last)/1000):0;motion.last=now;motion.events++;
+ if(!motion.active){motion.active=true;clearTimeout(motion.waiting);motionButton.hidden=true;setHint();}
  if(!motion.gravity){motion.gravity={x:g.x,y:g.y};motion.pose={x:g.x,y:g.y};return;}
- const fast=1-Math.exp(-dt*8),slow=1-Math.exp(-dt/POSE_RELAX);
- motion.gravity.x+=(g.x-motion.gravity.x)*fast;motion.gravity.y+=(g.y-motion.gravity.y)*fast;
+ const before={x:motion.gravity.x,y:motion.gravity.y},fast=1-Math.exp(-dt*10),slow=1-Math.exp(-dt/LEAN_RELAX);
+ motion.gravity.x+=(g.x-before.x)*fast;motion.gravity.y+=(g.y-before.y)*fast;
  motion.pose.x+=(motion.gravity.x-motion.pose.x)*slow;motion.pose.y+=(motion.gravity.y-motion.pose.y)*slow;
  const a=e.acceleration,ax=a&&a.x!=null?a.x:g.x-motion.gravity.x,ay=a&&a.y!=null?a.y:g.y-motion.gravity.y;
- const tilt=liquidDirection(motion.gravity.x-motion.pose.x,motion.gravity.y-motion.pose.y),shake=liquidDirection(ax,ay);
- let fx=tilt.x*TILT_GAIN+shake.x*SHAKE_GAIN,fy=tilt.y*TILT_GAIN+shake.y*SHAKE_GAIN;
- const m=Math.hypot(fx,fy);if(m>FORCE_LIMIT){fx*=FORCE_LIMIT/m;fy*=FORCE_LIMIT/m;}
- parameters.gravityX=fx;parameters.gravityY=fy;
- if(m>600)idleSince=now;
+ const shake=liquidDirection(ax,ay),turn=liquidDirection(motion.gravity.x-before.x,motion.gravity.y-before.y),lean=liquidDirection(motion.gravity.x-motion.pose.x,motion.gravity.y-motion.pose.y);
+ const dx=clampNudge(shake.x*SHAKE_GAIN*dt+turn.x*TILT_GAIN),dy=clampNudge(shake.y*SHAKE_GAIN*dt+turn.y*TILT_GAIN);
+ if(fluid&&isHome()&&!document.hidden&&Math.hypot(dx,dy)>1.5){fluid.nudge(dx,dy);idleSince=now;}
+ parameters.gravityX=lean.x*LEAN_GAIN;parameters.gravityY=lean.y*LEAN_GAIN;
+ if(debug)debug.textContent=`sensor aktiv · ${motion.events} ereignisse\na ${ax.toFixed(2)} ${ay.toFixed(2)}  g ${g.x.toFixed(2)} ${g.y.toFixed(2)} ${(g.z??0).toFixed(2)}\nschub ${dx.toFixed(0)} ${dy.toFixed(0)} px/s  lehnen ${parameters.gravityX.toFixed(0)} ${parameters.gravityY.toFixed(0)}`;
 }
-// Without fresh sensor data the force must not linger.
+// Without fresh sensor data the lean must not linger.
 function settleMotion(t){if(motion.last&&t-motion.last>SENSOR_TIMEOUT)parameters.gravityX=parameters.gravityY=0;}
 function resetMotion(){parameters.gravityX=parameters.gravityY=0;motion.gravity=null;motion.last=0;}
-function startMotion(){window.addEventListener('devicemotion',onMotion,{passive:true});}
-const touchDevice=navigator.maxTouchPoints>0||matchMedia('(pointer: coarse)').matches;
-if(touchDevice&&'DeviceMotionEvent' in window&&!reducedMotion.matches){
- if(typeof DeviceMotionEvent.requestPermission==='function'){
-  // iOS asks once, and only from a tap.
-  motionButton.hidden=false;
-  motionButton.addEventListener('click',()=>{DeviceMotionEvent.requestPermission().then(state=>{if(state==='granted')startMotion();}).catch(()=>{}).finally(()=>{motionButton.hidden=true;});});
- }else startMotion();
+function startMotion(){
+ window.removeEventListener('devicemotion',onMotion);window.addEventListener('devicemotion',onMotion,{passive:true});
+ if(debug&&!motion.active)debug.textContent='sensor angefragt, warte auf ereignisse …';
 }
+// Tapping the button is the user gesture iOS needs, and on every phone it
+// tells within a moment whether the browser delivers motion data at all.
+function requestMotion(){
+ clearTimeout(motion.waiting);
+ const ask=typeof DeviceMotionEvent.requestPermission==='function'?DeviceMotionEvent.requestPermission():Promise.resolve('granted');
+ ask.then(state=>{
+  if(state!=='granted'){motionButton.hidden=true;setHint('Der Browser hat die Bewegungsdaten nicht freigegeben.');return;}
+  startMotion();
+  motion.waiting=setTimeout(()=>{if(!motion.active){motionButton.hidden=true;setHint('Dieser Browser liefert keine Bewegungsdaten.');}},SENSOR_WAIT);
+ }).catch(()=>{motionButton.hidden=true;setHint('Bewegungsdaten sind hier nicht verfügbar.');});
+}
+const touchDevice=navigator.maxTouchPoints>0||matchMedia('(pointer: coarse)').matches;
+const motionPossible=touchDevice&&'DeviceMotionEvent' in window&&!reducedMotion.matches;
+if(motionPossible){
+ motionButton.hidden=false;
+ motionButton.addEventListener('click',requestMotion);
+ // Android delivers without asking; the button disappears as soon as data arrives.
+ if(typeof DeviceMotionEvent.requestPermission!=='function')startMotion();
+}else if(debug)debug.textContent=`kein sensor: touch ${touchDevice} · api ${'DeviceMotionEvent' in window} · reduzierte bewegung ${reducedMotion.matches}`;
 
 // ------------------------------------------------------------ navigation ---
 const views=new Map([...document.querySelectorAll('.view')].map(v=>[v.dataset.view,v]));

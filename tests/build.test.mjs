@@ -19,6 +19,16 @@ test('MS subpage is built with its font and licence',()=>{
  assert.match(html,/<meta name="robots" content="noindex">/);
  assert.match(html,/<link rel="canonical" href="https:\/\/matthiassuetterlin\.github\.io\/matthiassuetterlin-website\/">/);
 });
+test('dist references carry one shared version stamp',()=>{
+ const stamps=new Set();
+ for(const file of ['dist/index.html','dist/app.mjs','dist/MS/index.html','dist/MS/ms.mjs']){
+  const refs=[...fs.readFileSync(file,'utf8').matchAll(/["'](\.\.?\/[\w./-]+\.(?:mjs|css))(\?v=[0-9a-f]{8})?["']/g)];
+  assert.ok(refs.length>0,file);
+  for(const m of refs){assert.ok(m[2],`${file}: ${m[1]} is not stamped`);stamps.add(m[2]);}
+ }
+ assert.equal(stamps.size,1);
+ assert.ok(!/\?v=/.test(fs.readFileSync('Liquid-Type-Offline.html','utf8')));
+});
 test('every local reference in dist resolves to a built file',()=>{
  const files=fs.readdirSync('dist',{recursive:true}).map(f=>path.join('dist',f)).filter(f=>/\.(html|css|mjs)$/.test(f));
  for(const file of files){
