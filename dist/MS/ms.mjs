@@ -1,8 +1,8 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=a104e970';
-import {FluidRenderer} from '../render.mjs?v=a104e970';
-import {sampleGlyphs} from '../glyphs.mjs?v=a104e970';
-import {restrain} from './coupling.mjs?v=a104e970';
+import {Fluid} from '../physics.mjs?v=1204c690';
+import {FluidRenderer} from '../render.mjs?v=1204c690';
+import {sampleGlyphs} from '../glyphs.mjs?v=1204c690';
+import {restrain} from './coupling.mjs?v=1204c690';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -63,15 +63,13 @@ function paint(g,layout){
  }
 }
 function rebuild(force=false){
- if(!renderer||!isHome())return;
- const box=home.getBoundingClientRect(),nw=Math.round(box.width),nh=Math.round(box.height);
- if(nw<2||nh<2)return;
+ if(!renderer||!isHome()||transition)return;
+ if(!fitCanvas())return;
  const layout=glyphLayout();
- const key=[nw,nh,...layout.map(l=>[l.x,l.y,l.height,l.font].join())].join('|');
+ const key=[w,h,...layout.map(l=>[l.x,l.y,l.height,l.font].join())].join('|');
  if(!force&&key===layoutKey&&fluid)return;
  layoutKey=key;
- if(nw!==w||nh!==h){w=nw;h=nh;renderer.resize(w,h);}
- const {points,spacing,material}=sampleGlyphs(w,h,g=>paint(g,layout),w<700?2200:4200);
+ const {points,spacing,material}=sampleInitials(layout);
  renderer.setMaterial(material);
  const old=fluid;fluid=new Fluid(points,w,h,spacing);
  // A rebuild mid-flight (font load, resize) keeps the liquid where it was.
@@ -88,6 +86,13 @@ function rebuild(force=false){
  magnet.radius=size*MAGNET_RADIUS;
  ghost=null;draw();
 }
+function fitCanvas(){
+ const box=home.getBoundingClientRect(),nw=Math.round(box.width),nh=Math.round(box.height);
+ if(nw<2||nh<2)return false;
+ if(nw!==w||nh!==h){w=nw;h=nh;renderer.resize(w,h);}
+ return true;
+}
+const sampleInitials=layout=>sampleGlyphs(w,h,g=>paint(g,layout),w<700?2200:4200);
 const clampX=v=>Math.max(fluid.spacing,Math.min(w-fluid.spacing,v));
 const clampY=v=>Math.max(fluid.spacing,Math.min(h-fluid.spacing,v));
 // The letters condense from scattered drops instead of simply appearing.
@@ -129,12 +134,12 @@ function effects(t){
  else if(t>nextDrip){if(!reducedMotion.matches&&!pointer.down&&!burstUntil&&!intro.open&&calm())startDrip(t);else nextDrip=t+800;}
 }
 function scheduleRebuild(){clearTimeout(rebuildTimer);rebuildTimer=setTimeout(()=>rebuild(),120);}
-function draw(){if(renderer&&fluid)renderer.draw(fluid);}
+function draw(){if(renderer&&fluid)renderer.draw(fluid,dropSpacingNow(performance.now()));}
 function local(e){const r=home.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
 function disturb(x,y,dx,dy,radius){if(fluid&&Math.abs(dx)+Math.abs(dy)>=.1)fluid.impulse(x,y,dx,dy,radius);}
 
 home.addEventListener('pointerdown',e=>{
- if(!fluid||pointer.id!==null||e.button>0||e.target.closest('a, .link, .line-hit'))return;
+ if(!fluid||transition||pointer.id!==null||e.button>0||e.target.closest('a, .link, .line-hit'))return;
  const p=local(e);
  Object.assign(pointer,{x:p.x,y:p.y,startX:e.clientX,startY:e.clientY,down:true,id:e.pointerId,last:performance.now(),dragged:false});
  idleSince=performance.now();magnetOn=false;
@@ -142,7 +147,7 @@ home.addEventListener('pointerdown',e=>{
 });
 home.addEventListener('contextmenu',e=>{if(e.target.closest('.initial, .liquid'))e.preventDefault();});
 window.addEventListener('pointermove',e=>{
- if(!fluid||!isHome()||(pointer.id!==null&&e.pointerId!==pointer.id))return;
+ if(!fluid||!isHome()||transition||(pointer.id!==null&&e.pointerId!==pointer.id))return;
  if(pointer.down&&e.pointerType==='mouse'&&e.buttons===0)release(e);
  const p=local(e),now=performance.now();
  if(pointer.last){
@@ -168,7 +173,7 @@ initials.addEventListener('click',e=>{if(performance.now()<suppressClickUntil){e
 // Arrow keys on a focused letter send a wave through the liquid.
 initials.addEventListener('keydown',e=>{
  const dir={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];
- if(!dir||!fluid||!centre)return;
+ if(!dir||!fluid||!centre||transition)return;
  e.preventDefault();idleSince=performance.now();
  fluid.impulse(centre.x,centre.y,dir[0]*420,dir[1]*420,Math.max(w,h));
 });
@@ -187,8 +192,16 @@ function frame(t){
  // The home line runs on the same clock as the liquid, so both can push each other.
  homeLine?.step(dt,Math.min(LINE_LOAD_MAX,lineLoad)*LINE_LOAD_GAIN,lineKick);lineKick=0;
  if(!fluid||!renderer)return;
- settleMotion(t);idleMotion(t);effects(t);
+ settleMotion(t);
  accumulator=Math.min(.04,accumulator+dt);
+ if(transition){
+  // In flight between initials and heading: plain, thicker physics so the
+  // liquid is calm when the real heading takes over; nothing else.
+  const flight={...parameters,viscosity:Math.max(parameters.viscosity,MORPH_VISCOSITY)};
+  while(accumulator>=1/120){fluid.step(1/120,flight,null);accumulator-=1/120;}
+  draw();return;
+ }
+ idleMotion(t);effects(t);
  if(accumulator>=1/120){
   const box=home.getBoundingClientRect(),shape=homeLine?.shape();
   const line=shape&&{top:shape.top-box.top,width:shape.width,anchor:shape.anchor,offset:shape.offset,rate:shape.rate,shift:box.left};
@@ -275,18 +288,95 @@ if(motionPossible){
 const views=new Map([...document.querySelectorAll('.view')].map(v=>[v.dataset.view,v]));
 const parents={about:'home',projects:'home',contact:'home',fernen:'projects',adac:'projects',dreamco:'projects'};
 const baseTitle=document.title;
-let current=null;
+// Opening a section, the initials flow into its heading (MORPH_MS), then the
+// real heading and text take over (FADE_MS). Coming back, the heading flows
+// into the initials.
+const MORPH_MS=1000,FADE_MS=350,MORPH_VISCOSITY=.85;
+let current=null,transition=null,homeEntry=null;
 function viewFromHash(){const name=decodeURIComponent(location.hash.slice(1));return views.has(name)?name:'home';}
-function show(name,focus=true){
- if(!views.has(name))name='home';
- if(name===current)return;
- current=name;
- for(const [key,view] of views){const on=key===name;view.hidden=!on;view.classList.toggle('is-active',on);}
+function chrome(name){
  const label=views.get(name).getAttribute('aria-label');
  back.hidden=name==='home';crumb.textContent=label;
  document.title=name==='home'?baseTitle:`${label} — Matthias Sütterlin`;
- window.scrollTo(0,0);
- if(name==='home'){release({pointerId:pointer.id});last=0;idleSince=performance.now();resetMotion();requestAnimationFrame(()=>{rebuild();scatter();});}
+}
+const canMorph=()=>!!renderer&&!!fluid?.n&&!reducedMotion.matches&&!home.classList.contains('no-liquid');
+// A displayed view's single-line heading as a drawing in page coordinates,
+// which equal the home canvas coordinates; null when wrapped or not laid out.
+function headingShape(view){
+ const h2=view.querySelector('h2');if(!h2)return null;
+ const r=h2.getBoundingClientRect(),cs=getComputedStyle(h2),size=parseFloat(cs.fontSize);
+ if(r.width<2||r.height>size*1.4)return null;
+ const text=h2.textContent.trim(),font=`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,spacing=cs.letterSpacing;
+ const x=r.left+scrollX,top=r.top+scrollY,height=r.height;
+ return {draw(g){
+  g.font=font;if('letterSpacing' in g)g.letterSpacing=spacing;g.fillStyle='black';g.textAlign='left';g.textBaseline='alphabetic';
+  const m=g.measureText('M'),asc=m.fontBoundingBoxAscent,desc=m.fontBoundingBoxDescent;
+  const baseline=Number.isFinite(asc)&&Number.isFinite(desc)?top+(height-asc-desc)/2+asc:top+height*.78;
+  g.fillText(text,x,baseline);
+ }};
+}
+function startTransition(t,ms){t.start=performance.now();t.timers=[];transition=t;t.timers.push(setTimeout(()=>{if(transition===t)t.finish();},ms));}
+function dropSpacingNow(t){
+ if(!transition||!fluid)return fluid?.spacing;
+ const k=Math.min(1,(t-transition.start)/MORPH_MS),e=k*k*(3-2*k);
+ return transition.dropFrom+(transition.dropTo-transition.dropFrom)*e;
+}
+function morphForward(name,focus){
+ const view=views.get(name);
+ view.hidden=false;view.classList.add('is-active','is-arriving');
+ const shape=headingShape(view);
+ if(!shape){view.hidden=true;view.classList.remove('is-active','is-arriving');return false;}
+ current=name;chrome(name);window.scrollTo(0,0);
+ home.classList.add('is-leaving');release({pointerId:pointer.id});magnetOn=false;drip=null;burstUntil=0;
+ const old=fluid,sample=sampleGlyphs(w,h,g=>shape.draw(g),Math.max(1200,old.n));
+ if(!sample.points.length){view.hidden=true;view.classList.remove('is-active','is-arriving');home.classList.remove('is-leaving');return false;}
+ renderer.setMaterial(sample.material);
+ fluid=new Fluid(sample.points,w,h,sample.spacing);
+ for(let i=0;i<fluid.n;i++){const j=Math.min(old.n-1,Math.floor(i*old.n/fluid.n));fluid.x[i]=old.x[j];fluid.y[i]=old.y[j];fluid.vx[i]=old.vx[j]*.3;fluid.vy[i]=old.vy[j]*.3;}
+ const t={dropFrom:old.spacing,dropTo:fluid.spacing,finish(){
+  for(const id of t.timers)clearTimeout(id);
+  home.hidden=true;home.classList.remove('is-active','is-leaving');
+  view.classList.remove('is-arriving','is-revealed');canvas.classList.remove('is-fading');
+  transition=null;layoutKey='';
+  if(focus)view.querySelector('h2')?.focus({preventScroll:true});
+ }};
+ startTransition(t,MORPH_MS+FADE_MS);
+ t.timers.push(setTimeout(()=>{if(transition===t){view.classList.add('is-revealed');canvas.classList.add('is-fading');}},MORPH_MS));
+ return true;
+}
+// Returning home: a liquid of the heading's own density starts as the
+// heading and flows to the initials. The initials hold far more liquid than
+// a heading, so the full set of particles only takes over on arrival.
+function arriveFrom(shape){
+ if(!renderer||!shape||!fitCanvas()){rebuild();scatter();return;}
+ const layout=glyphLayout(),ms=sampleInitials(layout);
+ const sample=sampleGlyphs(w,h,g=>shape.draw(g),Math.max(1200,ms.points.length));
+ if(!sample.points.length||!ms.points.length){rebuild();scatter();return;}
+ fluid=new Fluid(sample.points,w,h,sample.spacing);
+ for(let i=0;i<fluid.n;i++){const p=ms.points[Math.floor(i*ms.points.length/fluid.n)];fluid.tx[i]=p.x;fluid.ty[i]=p.y;}
+ renderer.setMaterial(ms.material);layoutKey='';
+ const t={dropFrom:sample.spacing,dropTo:ms.spacing,finish(){for(const id of t.timers)clearTimeout(id);transition=null;rebuild(true);}};
+ startTransition(t,MORPH_MS);
+ idleSince=performance.now();
+}
+function show(name,focus=true){
+ if(!views.has(name))name='home';
+ if(name===current)return;
+ transition?.finish();
+ const from=current;
+ if(canMorph()&&from==='home'&&name!=='home'&&morphForward(name,focus))return;
+ homeEntry=canMorph()&&name==='home'&&from&&from!=='home'?headingShape(views.get(from)):null;
+ plainShow(name,focus);
+}
+function plainShow(name,focus){
+ current=name;
+ for(const [key,view] of views){const on=key===name;view.hidden=!on;view.classList.toggle('is-active',on);}
+ chrome(name);window.scrollTo(0,0);
+ if(name==='home'){
+  release({pointerId:pointer.id});last=0;idleSince=performance.now();resetMotion();
+  const entry=homeEntry;homeEntry=null;
+  requestAnimationFrame(()=>{if(entry)arriveFrom(entry);else{rebuild();scatter();}});
+ }
  if(focus)(name==='home'?letters[0]:views.get(name).querySelector('h2'))?.focus({preventScroll:true});
 }
 function go(name){
