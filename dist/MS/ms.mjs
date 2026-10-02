@@ -1,8 +1,8 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=c9b3dccc';
-import {FluidRenderer} from '../render.mjs?v=c9b3dccc';
-import {sampleGlyphs} from '../glyphs.mjs?v=c9b3dccc';
-import {restrain} from './coupling.mjs?v=c9b3dccc';
+import {Fluid} from '../physics.mjs?v=7c1d610b';
+import {FluidRenderer} from '../render.mjs?v=7c1d610b';
+import {sampleGlyphs} from '../glyphs.mjs?v=7c1d610b';
+import {restrain} from './coupling.mjs?v=7c1d610b';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -11,22 +11,33 @@ const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 // Impulse strength, attraction and viscosity at the maximum of the main page's sliders.
 const parameters={viscosity:1,tension:.65,attraction:1,strength:2.1,gravityX:0,gravityY:0,dripGravity:1400};
 const pointer={x:0,y:0,down:false,radius:80,id:null,last:0,startX:0,startY:0,dragged:false};
-const IDLE_DELAY=5000,IDLE_FORCE=1.6;
-// Letters condense from a cloud this wide (share of the shorter canvas side).
-const ASSEMBLE_SPREAD=.3,ASSEMBLE_MS=1800;
-// While the cloud condenses the liquid flows thin; the honey-like
-// interaction parameters take over once the letters stand.
-// Holding a letter gathers the liquid, then it bursts; the spring lets go briefly.
-const HOLD_MS=480,BURST_SPEED=1100,BURST_FREE_MS=260;
-// Drops detach from the lowest edge every few quiet seconds and fall onto the line.
-const DRIP_MIN=5000,DRIP_MAX=9000,DRIP_FALL_MS=1300,DRIP_SIZE=2.3,CALM_SPEED=25;
-// A hovering mouse between M and S draws the liquid of both toward it.
-const MAGNET_STRENGTH=2.2,MAGNET_RADIUS=.26;
-// The home line presses on the liquid and the liquid weighs on the line.
-const LINE_LOAD_GAIN=40,LINE_LOAD_MAX=600,LINE_IMPACT_GAIN=.05,LINE_KICK_MAX=400;
+// Every effect's dials. Adjustable live from the tuning panel (bottom left)
+// and remembered in this browser; `defaults` restores them.
+const defaults={
+ // Idle: after this quiet time an invisible hand drifts around the initials.
+ idleDelay:5000,idleForce:1.6,
+ // Letters condense from a cloud this wide (share of the shorter canvas
+ // side); while condensing the liquid flows thin for assembleMs.
+ assembleSpread:.3,assembleMs:1800,
+ // Holding gathers the liquid, then it bursts; the spring lets go briefly.
+ holdMs:480,burstSpeed:1100,burstFreeMs:260,
+ // Drops detach from the lowest edge every few quiet seconds.
+ dripMin:5000,dripMax:9000,dripFallMs:1300,dripSize:2.3,
+ // A hovering mouse between M and S draws the liquid of both toward it.
+ magnetStrength:2.2,magnetRadius:.26,
+ // The home line: resting liquid bends it, landing drops kick it.
+ lineLoadGain:40,lineImpactGain:.05,
+ // Phone sensors: px/s per m/s² for shaking and quick tilts, px/s² of
+ // faint gravity toward a new lean.
+ shakeGain:650,tiltGain:90,leanGain:120,
+ // Flight between initials and headings, and its viscosity.
+ morphMs:1000,morphViscosity:.85,
+};
+const tune={...defaults};
+const CALM_SPEED=25,LINE_LOAD_MAX=600,LINE_KICK_MAX=400;
 let renderer=null,fluid=null,w=0,h=0,last=0,accumulator=0,layoutKey='',rebuildTimer=0;
 let idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null,homeLine=null,lineLoad=0,lineKick=0;
-let holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+DRIP_MIN,gap=null,magnetOn=false,settleUntil=0;
+let holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+tune.dripMin,gap=null,magnetOn=false,settleUntil=0,letterSize=200;
 const magnet={x:0,y:0,down:true,radius:0};
 const darkScheme=matchMedia('(prefers-color-scheme: dark)');
 const isHome=()=>home.classList.contains('is-active');
@@ -86,7 +97,7 @@ function rebuild(force=false){
  centre={x:(left+right)/2,y:layout[0]?layout[0].y+layout[0].height/2:h/2,rx:(right-left)*.42,ry:size*.3};
  pointer.radius=Math.max(50,Math.min(110,size*.32));
  gap=layout.length>1?{left:layout[0].x+layout[0].width-size*.2,right:layout[1].x+size*.2,top:layout[0].y,bottom:layout[0].y+layout[0].height}:null;
- magnet.radius=size*MAGNET_RADIUS;
+ letterSize=size;
  ghost=null;draw();
 }
 function fitCanvas(){
@@ -101,12 +112,12 @@ const clampY=v=>Math.max(fluid.spacing,Math.min(h-fluid.spacing,v));
 // The letters condense from scattered drops instead of simply appearing.
 function scatter(){
  if(!fluid||reducedMotion.matches)return;
- const r=Math.min(w,h)*ASSEMBLE_SPREAD;
+ const r=Math.min(w,h)*tune.assembleSpread;
  for(let i=0;i<fluid.n;i++){
   const a=Math.random()*Math.PI*2,d=r*Math.sqrt(Math.random());
   fluid.x[i]=clampX(fluid.tx[i]+Math.cos(a)*d);fluid.y[i]=clampY(fluid.ty[i]+Math.sin(a)*d);fluid.vx[i]=fluid.vy[i]=0;
  }
- idleSince=performance.now();settleUntil=idleSince+ASSEMBLE_MS;
+ idleSince=performance.now();settleUntil=idleSince+tune.assembleMs;
 }
 // Everything flies away from the press point; the spring lets go for a moment.
 function burst(x,y){
@@ -115,10 +126,10 @@ function burst(x,y){
  for(let i=0;i<fluid.n;i++){
   const dx=fluid.x[i]-x,dy=fluid.y[i]-y,d=Math.hypot(dx,dy)||1,f=1-d/R;
   if(f<=0)continue;
-  const speed=BURST_SPEED*Math.sqrt(f)*(.8+.4*Math.random());
+  const speed=tune.burstSpeed*Math.sqrt(f)*(.8+.4*Math.random());
   fluid.vx[i]=Math.max(-1500,Math.min(1500,fluid.vx[i]+dx/d*speed));fluid.vy[i]=Math.max(-1500,Math.min(1500,fluid.vy[i]+dy/d*speed));
  }
- if(!reducedMotion.matches){fluid.free.fill(1);burstUntil=now+BURST_FREE_MS;drip=null;}
+ if(!reducedMotion.matches){fluid.free.fill(1);burstUntil=now+tune.burstFreeMs;drip=null;}
  pointer.down=false;pointer.dragged=true;suppressClickUntil=now+600;idleSince=now;
  try{navigator.vibrate?.(20);}catch{/* optional */}
 }
@@ -127,13 +138,13 @@ function startDrip(t){
  let lowest=0;for(let i=0;i<fluid.n;i++)if(fluid.ty[i]>lowest)lowest=fluid.ty[i];
  const bottom=[];for(let i=0;i<fluid.n;i++)if(fluid.ty[i]>=lowest-fluid.spacing*2.5)bottom.push(i);
  if(!bottom.length)return;
- const seed=bottom[Math.floor(Math.random()*bottom.length)],sx=fluid.tx[seed],sy=fluid.ty[seed],r=fluid.spacing*DRIP_SIZE;
+ const seed=bottom[Math.floor(Math.random()*bottom.length)],sx=fluid.tx[seed],sy=fluid.ty[seed],r=fluid.spacing*tune.dripSize;
  const indices=[];for(let i=0;i<fluid.n;i++)if(Math.hypot(fluid.tx[i]-sx,fluid.ty[i]-sy)<r){indices.push(i);fluid.free[i]=1;}
- drip={indices,until:t+DRIP_FALL_MS};
+ drip={indices,until:t+tune.dripFallMs};
 }
 function effects(t){
  if(burstUntil&&t>burstUntil){fluid.free.fill(0);burstUntil=0;}
- if(drip){if(t>drip.until){for(const i of drip.indices)fluid.free[i]=0;drip=null;nextDrip=t+DRIP_MIN+Math.random()*(DRIP_MAX-DRIP_MIN);}}
+ if(drip){if(t>drip.until){for(const i of drip.indices)fluid.free[i]=0;drip=null;nextDrip=t+tune.dripMin+Math.random()*Math.max(0,tune.dripMax-tune.dripMin);}}
  else if(t>nextDrip){if(!reducedMotion.matches&&!pointer.down&&!burstUntil&&!intro.open&&calm())startDrip(t);else nextDrip=t+800;}
 }
 function scheduleRebuild(){clearTimeout(rebuildTimer);rebuildTimer=setTimeout(()=>rebuild(),120);}
@@ -146,11 +157,11 @@ home.addEventListener('pointerdown',e=>{
  const p=local(e);
  Object.assign(pointer,{x:p.x,y:p.y,startX:e.clientX,startY:e.clientY,down:true,id:e.pointerId,last:performance.now(),dragged:false});
  idleSince=performance.now();magnetOn=false;
- clearTimeout(holdTimer);holdTimer=setTimeout(()=>{if(pointer.down&&!pointer.dragged)burst(pointer.x,pointer.y);},HOLD_MS);
+ clearTimeout(holdTimer);holdTimer=setTimeout(()=>{if(pointer.down&&!pointer.dragged)burst(pointer.x,pointer.y);},tune.holdMs);
 });
 home.addEventListener('contextmenu',e=>{if(e.target.closest('.initial, .liquid'))e.preventDefault();});
 window.addEventListener('pointermove',e=>{
- if(!fluid||!isHome()||transition||(pointer.id!==null&&e.pointerId!==pointer.id))return;
+ if(!fluid||!isHome()||transition||(pointer.id!==null&&e.pointerId!==pointer.id)||(!pointer.down&&e.target?.closest?.('.tune, .tune-toggle')))return;
  if(pointer.down&&e.pointerType==='mouse'&&e.buttons===0)release(e);
  const p=local(e),now=performance.now();
  if(pointer.last){
@@ -182,10 +193,10 @@ initials.addEventListener('keydown',e=>{
 });
 // After a quiet moment an invisible hand drifts around the initials.
 function idleMotion(t){
- if(reducedMotion.matches||pointer.down||!centre||t-idleSince<IDLE_DELAY){ghost=null;return;}
- const s=(t-idleSince-IDLE_DELAY)/1000;
+ if(reducedMotion.matches||pointer.down||!centre||t-idleSince<tune.idleDelay){ghost=null;return;}
+ const s=(t-idleSince-tune.idleDelay)/1000;
  const x=centre.x+Math.cos(s*.45)*centre.rx,y=centre.y+Math.sin(s*.7)*centre.ry;
- if(ghost)disturb(x,y,(x-ghost.x)*IDLE_FORCE*parameters.strength,(y-ghost.y)*IDLE_FORCE*parameters.strength,pointer.radius*.6);
+ if(ghost)disturb(x,y,(x-ghost.x)*tune.idleForce*parameters.strength,(y-ghost.y)*tune.idleForce*parameters.strength,pointer.radius*.6);
  ghost={x,y};
 }
 function frame(t){
@@ -193,14 +204,14 @@ function frame(t){
  if(document.hidden||(!isHome()&&!transition)){last=0;return;}
  const dt=last?Math.min(.04,(t-last)/1000):0;last=t;
  // The home line runs on the same clock as the liquid, so both can push each other.
- if(isHome()){homeLine?.step(dt,Math.min(LINE_LOAD_MAX,lineLoad)*LINE_LOAD_GAIN,lineKick);lineKick=0;}
+ if(isHome()){homeLine?.step(dt,Math.min(LINE_LOAD_MAX,lineLoad)*tune.lineLoadGain,lineKick);lineKick=0;}
  if(!fluid||!renderer)return;
  settleMotion(t);
  accumulator=Math.min(.04,accumulator+dt);
  if(transition){
   // In flight between initials and heading: plain, thicker physics so the
   // liquid is calm when the real heading takes over; nothing else.
-  const flight={...parameters,viscosity:Math.max(parameters.viscosity,MORPH_VISCOSITY)};
+  const flight={...parameters,viscosity:Math.max(parameters.viscosity,tune.morphViscosity)};
   while(accumulator>=1/120){fluid.step(1/120,flight,null);accumulator-=1/120;}
   draw();return;
  }
@@ -208,11 +219,12 @@ function frame(t){
  if(accumulator>=1/120){
   const box=canvas.getBoundingClientRect(),shape=homeLine?.shape();
   const line=shape&&{top:shape.top-box.top,width:shape.width,anchor:shape.anchor,offset:shape.offset,rate:shape.rate,shift:box.left};
+  magnet.radius=letterSize*tune.magnetRadius;
   const brush=pointer.down?pointer:magnetOn&&!reducedMotion.matches?magnet:null;
-  const prm=brush===magnet?{...parameters,strength:MAGNET_STRENGTH}:t<settleUntil?{...parameters,viscosity:.3,attraction:.5}:parameters;
+  const prm=brush===magnet?{...parameters,strength:tune.magnetStrength}:t<settleUntil?{...parameters,viscosity:.3,attraction:.5}:parameters;
   while(accumulator>=1/120){
    fluid.step(1/120,prm,brush);
-   if(line){const hit=restrain(fluid,line);lineLoad=hit.load;lineKick+=Math.min(LINE_KICK_MAX,hit.impact*LINE_IMPACT_GAIN);}
+   if(line){const hit=restrain(fluid,line);lineLoad=hit.load;lineKick+=Math.min(LINE_KICK_MAX,hit.impact*tune.lineImpactGain);}
    accumulator-=1/120;
   }
  }
@@ -228,11 +240,11 @@ document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;release({
 // ----------------------------------------------------------------- motion ---
 // Phone sensors. Only changes count: a shake or a quick tilt sends the liquid
 // off; holding the phone still in any position does nothing lasting. Device
-// acceleration (m/s²) becomes liquid velocity (px/s): SHAKE_GAIN integrates
-// linear acceleration (px per metre), TILT_GAIN scales the change of the
-// gravity direction per event, LEAN_GAIN is a faint force toward the tilt
-// that relaxes within LEAN_RELAX seconds.
-const SHAKE_GAIN=650,TILT_GAIN=90,LEAN_GAIN=120,LEAN_RELAX=2,NUDGE_LIMIT=260,SENSOR_TIMEOUT=300,SENSOR_WAIT=2500;
+// acceleration (m/s²) becomes liquid velocity (px/s): tune.shakeGain
+// integrates linear acceleration (px per metre), tune.tiltGain scales the
+// change of the gravity direction per event, tune.leanGain is a faint force
+// toward the tilt that relaxes within LEAN_RELAX seconds.
+const LEAN_RELAX=2,NUDGE_LIMIT=260,SENSOR_TIMEOUT=300,SENSOR_WAIT=2500;
 const motion={active:false,gravity:null,pose:null,last:0,events:0,waiting:0};
 const debug=new URLSearchParams(location.search).has('debug')?Object.assign(document.body.appendChild(document.createElement('pre')),{className:'debug'}):null;
 // With ?debug the running simulation is reachable from the console for tuning.
@@ -255,9 +267,9 @@ function onMotion(e){
  motion.pose.x+=(motion.gravity.x-motion.pose.x)*slow;motion.pose.y+=(motion.gravity.y-motion.pose.y)*slow;
  const a=e.acceleration,ax=a&&a.x!=null?a.x:g.x-motion.gravity.x,ay=a&&a.y!=null?a.y:g.y-motion.gravity.y;
  const shake=liquidDirection(ax,ay),turn=liquidDirection(motion.gravity.x-before.x,motion.gravity.y-before.y),lean=liquidDirection(motion.gravity.x-motion.pose.x,motion.gravity.y-motion.pose.y);
- const dx=clampNudge(shake.x*SHAKE_GAIN*dt+turn.x*TILT_GAIN),dy=clampNudge(shake.y*SHAKE_GAIN*dt+turn.y*TILT_GAIN);
+ const dx=clampNudge(shake.x*tune.shakeGain*dt+turn.x*tune.tiltGain),dy=clampNudge(shake.y*tune.shakeGain*dt+turn.y*tune.tiltGain);
  if(fluid&&isHome()&&!document.hidden&&Math.hypot(dx,dy)>1.5){fluid.nudge(dx,dy);idleSince=now;}
- parameters.gravityX=lean.x*LEAN_GAIN;parameters.gravityY=lean.y*LEAN_GAIN;
+ parameters.gravityX=lean.x*tune.leanGain;parameters.gravityY=lean.y*tune.leanGain;
  if(debug)debug.textContent=`sensor aktiv · ${motion.events} ereignisse\na ${ax.toFixed(2)} ${ay.toFixed(2)}  g ${g.x.toFixed(2)} ${g.y.toFixed(2)} ${(g.z??0).toFixed(2)}\nschub ${dx.toFixed(0)} ${dy.toFixed(0)} px/s  lehnen ${parameters.gravityX.toFixed(0)} ${parameters.gravityY.toFixed(0)}`;
 }
 // Without fresh sensor data the lean must not linger.
@@ -291,10 +303,10 @@ if(motionPossible){
 const views=new Map([...document.querySelectorAll('.view')].map(v=>[v.dataset.view,v]));
 const parents={about:'home',projects:'home',contact:'home',fernen:'projects',adac:'projects',dreamco:'projects'};
 const baseTitle=document.title;
-// Opening a section, the initials flow into its heading (MORPH_MS), then the
+// Opening a section, the initials flow into its text (tune.morphMs), then the
 // real heading and text take over (FADE_MS). Coming back, the heading flows
 // into the initials.
-const MORPH_MS=1000,FADE_MS=350,MORPH_VISCOSITY=.85;
+const FADE_MS=350;
 let current=null,transition=null,homeEntry=null;
 function viewFromHash(){const name=decodeURIComponent(location.hash.slice(1));return views.has(name)?name:'home';}
 function chrome(name){
@@ -303,28 +315,39 @@ function chrome(name){
  document.title=name==='home'?baseTitle:`${label} — Matthias Sütterlin`;
 }
 const canMorph=()=>!!renderer&&!reducedMotion.matches&&!home.classList.contains('no-liquid');
-// A displayed view's heading as a drawing in page coordinates, which equal
-// the liquid canvas coordinates. Every word is placed where the browser laid
-// it out, so wrapped headings match line for line; null when not laid out.
-function headingShape(view){
- const h2=view.querySelector('h2');if(!h2)return null;
- const cs=getComputedStyle(h2),font=`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,spacing=cs.letterSpacing;
- const words=[],walker=document.createTreeWalker(h2,NodeFilter.SHOW_TEXT);
+// A displayed view's whole text (heading, paragraphs, facts, links) as a
+// drawing in page coordinates, which equal the liquid canvas coordinates.
+// Every word is placed where the browser laid it out, in its own font, so
+// wrapped headings and body text match line for line; null when not laid out.
+function textShape(view){
+ const panel=view.querySelector('.panel');if(!panel)return null;
+ const styles=new Map(),words=[],walker=document.createTreeWalker(panel,NodeFilter.SHOW_TEXT);
  for(let node=walker.nextNode();node;node=walker.nextNode()){
+  const el=node.parentElement;if(!el||el.closest('.line'))continue;
+  let style=styles.get(el);
+  if(!style){const cs=getComputedStyle(el);style={font:`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,spacing:cs.letterSpacing,upper:cs.textTransform==='uppercase'};styles.set(el,style);}
   for(const m of node.data.matchAll(/\S+/g)){
    const range=document.createRange();range.setStart(node,m.index);range.setEnd(node,m.index+m[0].length);
    const r=range.getBoundingClientRect();
-   if(r.width>0&&r.height>0)words.push({text:m[0],x:r.left+scrollX,top:r.top+scrollY,height:r.height});
+   if(r.width>0&&r.height>0)words.push({text:style.upper?m[0].toUpperCase():m[0],x:r.left+scrollX,top:r.top+scrollY,height:r.height,style});
   }
  }
  if(!words.length)return null;
  return {draw(g){
-  g.font=font;if('letterSpacing' in g)g.letterSpacing=spacing;g.fillStyle='black';g.textAlign='left';g.textBaseline='alphabetic';
-  const m=g.measureText('M'),asc=m.fontBoundingBoxAscent,desc=m.fontBoundingBoxDescent,metric=Number.isFinite(asc)&&Number.isFinite(desc);
-  for(const word of words)g.fillText(word.text,word.x,metric?word.top+(word.height-asc-desc)/2+asc:word.top+word.height*.78);
+  g.fillStyle='black';g.textAlign='left';g.textBaseline='alphabetic';
+  const metrics=new Map();
+  for(const word of words){
+   const st=word.style;
+   let mt=metrics.get(st);
+   if(!mt){g.font=st.font;const m=g.measureText('M');mt={asc:m.fontBoundingBoxAscent,desc:m.fontBoundingBoxDescent};mt.ok=Number.isFinite(mt.asc)&&Number.isFinite(mt.desc);metrics.set(st,mt);}
+   g.font=st.font;if('letterSpacing' in g)g.letterSpacing=st.spacing;
+   g.fillText(word.text,word.x,mt.ok?word.top+(word.height-mt.asc-mt.desc)/2+mt.asc:word.top+word.height*.78);
+  }
  }};
 }
+const headingShape=textShape;
 const canvasOn=on=>{canvas.classList.toggle('is-off',!on);};
+const panelBudget=()=>w<700?2000:3200;
 // Overlay the target view with its heading hidden, measure the heading.
 function stage(view){
  view.hidden=false;view.classList.add('is-active','is-arriving');
@@ -342,14 +365,14 @@ function handOver(fromView,view,focus){
   transition=null;layoutKey='';
   if(focus)view.querySelector('h2')?.focus({preventScroll:true});
  }};
- startTransition(t,MORPH_MS+FADE_MS);
- t.timers.push(setTimeout(()=>{if(transition===t){view.classList.add('is-revealed');canvas.classList.add('is-fading');}},MORPH_MS));
+ startTransition(t,tune.morphMs+FADE_MS);
+ t.timers.push(setTimeout(()=>{if(transition===t){view.classList.add('is-revealed');canvas.classList.add('is-fading');}},tune.morphMs));
  return t;
 }
-function startTransition(t,ms){t.start=performance.now();t.timers=[];transition=t;t.timers.push(setTimeout(()=>{if(transition===t)t.finish();},ms));}
+function startTransition(t,ms){t.start=performance.now();t.ms=tune.morphMs;t.timers=[];transition=t;t.timers.push(setTimeout(()=>{if(transition===t)t.finish();},ms));}
 function dropSpacingNow(t){
  if(!transition||!fluid)return fluid?.spacing;
- const k=Math.min(1,(t-transition.start)/MORPH_MS),e=k*k*(3-2*k);
+ const k=Math.min(1,(t-transition.start)/transition.ms),e=k*k*(3-2*k);
  return transition.dropFrom+(transition.dropTo-transition.dropFrom)*e;
 }
 // Home to a section: the initials, in whatever state they are, dissolve
@@ -358,7 +381,7 @@ function morphForward(name,focus){
  if(!fluid?.n)return false;
  const view=views.get(name),shape=stage(view);
  if(!shape)return false;
- const old=fluid,sample=sampleGlyphs(w,h,g=>shape.draw(g),Math.max(1200,old.n));
+ const old=fluid,sample=sampleGlyphs(w,h,g=>shape.draw(g),panelBudget());
  if(!sample.points.length){unstage(view);return false;}
  current=name;chrome(name);window.scrollTo(0,0);
  home.classList.add('is-leaving');release({pointerId:pointer.id});magnetOn=false;drip=null;burstUntil=0;
@@ -377,7 +400,7 @@ function morphBetween(from,name,focus){
  if(!dst)return false;
  canvasOn(true);
  if(!fitCanvas()){unstage(view);canvasOn(false);return false;}
- const a=sampleGlyphs(w,h,g=>src.draw(g),2600),b=sampleGlyphs(w,h,g=>dst.draw(g),2600);
+ const a=sampleGlyphs(w,h,g=>src.draw(g),panelBudget()),b=sampleGlyphs(w,h,g=>dst.draw(g),panelBudget());
  if(!a.points.length||!b.points.length){unstage(view);canvasOn(false);return false;}
  current=name;chrome(name);window.scrollTo(0,0);
  fromView.classList.add('is-leaving');
@@ -394,13 +417,13 @@ function morphBetween(from,name,focus){
 function arriveFrom(shape){
  if(!renderer||!shape||!fitCanvas()){rebuild();scatter();return;}
  const layout=glyphLayout(),ms=sampleInitials(layout);
- const sample=sampleGlyphs(w,h,g=>shape.draw(g),Math.max(1200,ms.points.length));
+ const sample=sampleGlyphs(w,h,g=>shape.draw(g),panelBudget());
  if(!sample.points.length||!ms.points.length){rebuild();scatter();return;}
  fluid=new Fluid(sample.points,w,h,sample.spacing);
  for(let i=0;i<fluid.n;i++){const p=ms.points[Math.floor(i*ms.points.length/fluid.n)];fluid.tx[i]=p.x;fluid.ty[i]=p.y;}
  renderer.setMaterial(ms.material);layoutKey='';
  const t={dropFrom:sample.spacing,dropTo:ms.spacing,finish(){for(const id of t.timers)clearTimeout(id);transition=null;rebuild(true);}};
- startTransition(t,MORPH_MS);
+ startTransition(t,tune.morphMs);
  idleSince=performance.now();
 }
 function show(name,focus=true){
@@ -433,6 +456,52 @@ document.addEventListener('click',e=>{const target=e.target.closest('[data-go]')
 back.addEventListener('click',()=>go(parents[current]||'home'));
 window.addEventListener('popstate',()=>show(viewFromHash()));
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&!intro.open&&current!=='home')go(parents[current]||'home');});
+
+// ------------------------------------------------------------------ tune ---
+// Sliders for every dial above plus the physics parameters. Values live in
+// this browser (localStorage) so a phone can be tuned across reloads.
+const TUNE=[
+ ['Physik','viscosity','Zähflüssigkeit',0,1,.01,parameters],['Physik','tension','Oberflächenspannung',0,1,.01,parameters],['Physik','attraction','Anziehung',0,1,.01,parameters],['Physik','strength','Impulsstärke',.1,2.1,.01,parameters],
+ ['Zusammensetzen','assembleSpread','Streuung',.05,.6,.01],['Zusammensetzen','assembleMs','Dünnflüssig (ms)',0,4000,50],
+ ['Halten und Platzen','holdMs','Haltedauer (ms)',150,1500,10],['Halten und Platzen','burstSpeed','Stärke',200,2000,10],['Halten und Platzen','burstFreeMs','Freiflug (ms)',0,800,10],
+ ['Tropfen','dripMin','Pause mindestens (ms)',1000,20000,100],['Tropfen','dripMax','Pause höchstens (ms)',1000,30000,100],['Tropfen','dripFallMs','Fallzeit (ms)',200,4000,50],['Tropfen','dripSize','Größe',1,4,.1],['Tropfen','dripGravity','Schwerkraft',200,3000,10,parameters],
+ ['Magnet','magnetStrength','Stärke',0,6,.1],['Magnet','magnetRadius','Radius',.1,.6,.01],
+ ['Linie','lineLoadGain','Last',0,150,1],['Linie','lineImpactGain','Aufprall',0,.15,.005],
+ ['Ruhebewegung','idleDelay','Verzögerung (ms)',1000,15000,100],['Ruhebewegung','idleForce','Kraft',0,4,.1],
+ ['Sensoren','shakeGain','Schütteln',0,2000,10],['Sensoren','tiltGain','Kippen',0,300,1],['Sensoren','leanGain','Neigen (Schwerkraft)',0,500,5],
+ ['Übergang','morphMs','Flugzeit (ms)',300,2500,50],['Übergang','morphViscosity','Zähigkeit im Flug',0,1,.01],
+];
+const physicsDefaults={...parameters};
+const TUNE_KEY='ms-tune';
+function tuneValues(){const out={};for(const [,key,,,,,target] of TUNE)out[key]=(target||tune)[key];return out;}
+function loadTune(){
+ try{const saved=JSON.parse(localStorage.getItem(TUNE_KEY)||'{}');
+  for(const [,key,,min,max,,target] of TUNE){const v=Number(saved[key]);if(Number.isFinite(v))(target||tune)[key]=Math.min(max,Math.max(min,v));}
+ }catch{/* storage unavailable or unreadable */}
+}
+function saveTune(){try{localStorage.setItem(TUNE_KEY,JSON.stringify(tuneValues()));}catch{/* storage unavailable */}}
+function buildTune(){
+ const body=$('tuneBody'),values=$('tuneValues');if(!body)return;
+ body.textContent='';let group='';
+ const inputs=[];
+ for(const [grp,key,label,min,max,step,target] of TUNE){
+  if(grp!==group){group=grp;const h=document.createElement('div');h.className='tune-group';h.textContent=grp;body.append(h);}
+  const row=document.createElement('label');row.className='tune-row';
+  const name=document.createElement('span');name.textContent=label;
+  const out=document.createElement('output');
+  const input=document.createElement('input');input.type='range';input.min=String(min);input.max=String(max);input.step=String(step);
+  const show=()=>{const v=(target||tune)[key];input.value=String(v);out.value=step<1?v.toFixed(step<.01?3:2):String(Math.round(v));};
+  input.addEventListener('input',()=>{(target||tune)[key]=Number(input.value);show();saveTune();values.value=JSON.stringify(tuneValues());});
+  row.append(name,out,input);body.append(row);inputs.push(show);show();
+ }
+ const refresh=()=>{for(const show of inputs)show();values.value=JSON.stringify(tuneValues());};
+ refresh();
+ $('tuneReset').addEventListener('click',()=>{Object.assign(tune,defaults);Object.assign(parameters,physicsDefaults);try{localStorage.removeItem(TUNE_KEY);}catch{/* storage unavailable */}refresh();});
+ $('tuneCopy').addEventListener('click',()=>{values.select();navigator.clipboard?.writeText(values.value).catch(()=>{});});
+ const toggle=$('tuneToggle'),panel=$('tune');
+ toggle.addEventListener('click',()=>{const open=panel.hidden;panel.hidden=!open;toggle.setAttribute('aria-expanded',String(open));});
+}
+loadTune();buildTune();
 
 // ----------------------------------------------------------------- intro ---
 function closeIntro(){if(intro.open)intro.close();}

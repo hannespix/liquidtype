@@ -103,6 +103,12 @@
   </article>
  </section>
 </main>
+<button class="tune-toggle" id="tuneToggle" type="button" aria-expanded="false" aria-controls="tune" aria-label="Einstellungen der Flüssigkeit"><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></button>
+<aside class="tune" id="tune" aria-label="Einstellungen der Flüssigkeit" hidden>
+ <div class="tune-head"><strong>Flüssigkeit einstellen</strong><span><button class="link" id="tuneReset" type="button">Zurücksetzen</button><button class="link" id="tuneCopy" type="button">Werte kopieren</button></span></div>
+ <div class="tune-body" id="tuneBody"></div>
+ <textarea class="tune-values" id="tuneValues" readonly rows="3" aria-label="Aktuelle Werte als JSON"></textarea>
+</aside>
 <noscript><p class="noscript">Die Bereiche öffnen sich mit JavaScript. Kontakt: <a href="mailto:info@matthiassuetterlin.de">info@matthiassuetterlin.de</a></p></noscript>
 <script type="module" src="./ms.mjs"></script>
 </body>
