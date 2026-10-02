@@ -1,8 +1,8 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=67b39298';
-import {FluidRenderer} from '../render.mjs?v=67b39298';
-import {sampleGlyphs} from '../glyphs.mjs?v=67b39298';
-import {restrain,sagWeight} from './coupling.mjs?v=67b39298';
+import {Fluid} from '../physics.mjs?v=4b1a93a9';
+import {FluidRenderer} from '../render.mjs?v=4b1a93a9';
+import {sampleGlyphs} from '../glyphs.mjs?v=4b1a93a9';
+import {restrain,sagWeight} from './coupling.mjs?v=4b1a93a9';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -37,8 +37,11 @@ const defaults={
  // letters ride; their swing (stiffness, damping) and how hard scrolling
  // plucks them.
  gridSpacing:.2,gridStiffness:150,gridDamping:2.2,gridScroll:1.6,
- // Drops in motion draw at this share of their resting size.
- dropShrink:.55,
+ // Drops in motion may draw smaller than at rest (1 = full size).
+ dropShrink:1,
+ // In flight a particle's drop grows with the font size of its target word
+ // (px per font px, capped at the initials' drop size).
+ dropPerFontPx:.075,dropMax:5.5,
 };
 const tune={...defaults};
 const CALM_SPEED=25,LINE_LOAD_MAX=600,LINE_KICK_MAX=400;
@@ -156,7 +159,7 @@ function effects(t){
  else if(t>nextDrip){if(!reducedMotion.matches&&!pointer.down&&!burstUntil&&!intro.open&&calm())startDrip(t);else nextDrip=t+800;}
 }
 function scheduleRebuild(){clearTimeout(rebuildTimer);rebuildTimer=setTimeout(()=>rebuild(),120);}
-function draw(){if(renderer&&fluid){renderer.dropShrink=tune.dropShrink;renderer.draw(fluid,dropSpacingNow(performance.now()));}}
+function draw(){if(renderer&&fluid){renderer.dropShrink=tune.dropShrink;renderer.draw(fluid);}}
 function local(e){const r=canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
 function disturb(x,y,dx,dy,radius){if(fluid&&Math.abs(dx)+Math.abs(dy)>=.1)fluid.impulse(x,y,dx,dy,radius);}
 
@@ -221,7 +224,7 @@ function frame(t){
   // liquid is calm when the real heading takes over; nothing else.
   const flight={...parameters,viscosity:tune.morphViscosity,homing:tune.morphHoming};
   while(accumulator>=1/120){fluid.step(1/120,flight,null);accumulator-=1/120;}
-  draw();return;
+  blendSizes(t);draw();return;
  }
  idleMotion(t);effects(t);
  if(accumulator>=1/120){
@@ -333,15 +336,24 @@ function textShape(view){
  for(let node=walker.nextNode();node;node=walker.nextNode()){
   const el=node.parentElement;if(!el||el.closest('.line'))continue;
   let style=styles.get(el);
-  if(!style){const cs=getComputedStyle(el);style={font:`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,spacing:cs.letterSpacing,upper:cs.textTransform==='uppercase'};styles.set(el,style);}
+  if(!style){const cs=getComputedStyle(el);style={font:`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,spacing:cs.letterSpacing,upper:cs.textTransform==='uppercase',px:parseFloat(cs.fontSize)||16};styles.set(el,style);}
   for(const m of node.data.matchAll(/\S+/g)){
    const range=document.createRange();range.setStart(node,m.index);range.setEnd(node,m.index+m[0].length);
    const r=range.getBoundingClientRect();
-   if(r.width>0&&r.height>0)words.push({text:style.upper?m[0].toUpperCase():m[0],x:r.left+scrollX,top:r.top+scrollY,height:r.height,style});
+   if(r.width>0&&r.height>0)words.push({text:style.upper?m[0].toUpperCase():m[0],x:r.left+scrollX,top:r.top+scrollY,width:r.width,height:r.height,style});
   }
  }
  if(!words.length)return null;
- return {draw(g){
+ // Font size of the word at a page point, or of the nearest word.
+ const fontAt=(x,y)=>{
+  let best=null,bestD=Infinity;
+  for(const w of words){
+   const dx=Math.max(w.x-x,0,x-w.x-w.width),dy=Math.max(w.top-y,0,y-w.top-w.height),d=dx*dx+dy*dy;
+   if(d<bestD){bestD=d;best=w;if(!d)break;}
+  }
+  return best.style.px;
+ };
+ return {fontAt,draw(g){
   g.fillStyle='black';g.textAlign='left';g.textBaseline='alphabetic';
   const metrics=new Map();
   for(const word of words){
@@ -378,11 +390,23 @@ function handOver(fromView,view,focus){
  return t;
 }
 function startTransition(t,ms){t.start=performance.now();t.ms=tune.morphMs;t.timers=[];transition=t;t.timers.push(setTimeout(()=>{if(transition===t)t.finish();},ms));}
-// In flight the finer of both densities is drawn from the first frame on.
-function dropSpacingNow(){
- if(!transition||!fluid)return fluid?.spacing;
- return Math.min(transition.dropFrom,transition.dropTo);
+// Drop size for a particle whose word is set in a font of `px` pixels. A
+// drop's visible disc is about 1.75 times its size, so at 0.65 of the
+// lattice neighbouring drops still touch: small text stays a thin, joined
+// line rather than dust, large text gets full drops.
+const dropFor=(px,lattice)=>Math.max(lattice*.65,Math.min(tune.dropMax,px*tune.dropPerFontPx));
+// Per-particle drop sizes for a flight: `from` and `to` are arrays or one
+// number each; the drawn size blends between them over the flight.
+function flightSizes(t,from,to){
+ const n=fluid.n;t.sizeFrom=new Float32Array(n);t.sizeTo=new Float32Array(n);fluid.dropSize=new Float32Array(n);
+ for(let i=0;i<n;i++){t.sizeFrom[i]=typeof from==='number'?from:from[i];t.sizeTo[i]=typeof to==='number'?to:to[i];fluid.dropSize[i]=t.sizeFrom[i];}
 }
+function blendSizes(now){
+ const t=transition;if(!t?.sizeFrom||!fluid?.dropSize)return;
+ const k=Math.min(1,(now-t.start)/t.ms),e=k*k*(3-2*k);
+ for(let i=0;i<fluid.n;i++)fluid.dropSize[i]=t.sizeFrom[i]+(t.sizeTo[i]-t.sizeFrom[i])*e;
+}
+const sizesOf=(sample,shape)=>Float32Array.from(sample.points,p=>dropFor(shape.fontAt(p.x,p.y),sample.spacing));
 // Home to a section: the initials, in whatever state they are, dissolve
 // into the section's heading.
 function morphForward(name,focus){
@@ -396,7 +420,7 @@ function morphForward(name,focus){
  renderer.setMaterial(sample.material);
  fluid=new Fluid(sample.points,w,h,sample.spacing);
  for(let i=0;i<fluid.n;i++){const j=Math.min(old.n-1,Math.floor(i*old.n/fluid.n));fluid.x[i]=old.x[j];fluid.y[i]=old.y[j];fluid.vx[i]=old.vx[j]*.3;fluid.vy[i]=old.vy[j]*.3;}
- Object.assign(handOver(home,view,focus),{dropFrom:old.spacing,dropTo:fluid.spacing});
+ flightSizes(handOver(home,view,focus),old.spacing,sizesOf(sample,shape));
  return true;
 }
 // Section to section, including project pages: the current heading flows
@@ -414,8 +438,9 @@ function morphBetween(from,name,focus){
  fromView.classList.add('is-leaving');
  renderer.setMaterial(b.material);
  fluid=new Fluid(b.points,w,h,b.spacing);
- for(let i=0;i<fluid.n;i++){const p=a.points[Math.floor(i*a.points.length/fluid.n)];fluid.x[i]=p.x;fluid.y[i]=p.y;}
- Object.assign(handOver(fromView,view,focus),{dropFrom:a.spacing,dropTo:b.spacing});
+ const fromSizes=new Float32Array(fluid.n);
+ for(let i=0;i<fluid.n;i++){const p=a.points[Math.floor(i*a.points.length/fluid.n)];fluid.x[i]=p.x;fluid.y[i]=p.y;fromSizes[i]=dropFor(src.fontAt(p.x,p.y),a.spacing);}
+ flightSizes(handOver(fromView,view,focus),fromSizes,sizesOf(b,dst));
  draw();
  return true;
 }
@@ -430,8 +455,9 @@ function arriveFrom(shape){
  fluid=new Fluid(sample.points,w,h,sample.spacing);
  for(let i=0;i<fluid.n;i++){const p=ms.points[Math.floor(i*ms.points.length/fluid.n)];fluid.tx[i]=p.x;fluid.ty[i]=p.y;}
  renderer.setMaterial(ms.material);layoutKey='';
- const t={dropFrom:sample.spacing,dropTo:ms.spacing,finish(){for(const id of t.timers)clearTimeout(id);transition=null;rebuild(true);}};
+ const t={finish(){for(const id of t.timers)clearTimeout(id);transition=null;rebuild(true);}};
  startTransition(t,tune.morphMs);
+ flightSizes(t,sizesOf(sample,shape),ms.spacing);
  idleSince=performance.now();
 }
 function show(name,focus=true){
@@ -480,7 +506,7 @@ const TUNE=[
  ['Sensoren','shakeGain','Schütteln',0,2000,10],['Sensoren','tiltGain','Kippen',0,300,1],['Sensoren','leanGain','Neigen (Schwerkraft)',0,500,5],
  ['Übergang','morphMs','Flugzeit (ms)',300,2500,50],['Übergang','morphViscosity','Zähigkeit im Flug',0,1,.01],['Übergang','morphHoming','Zug zum Ziel',1,6,.1],
  ['Textgitter','gridSpacing','Abstand',.1,.4,.01],['Textgitter','gridStiffness','Schwingung',30,600,5],['Textgitter','gridDamping','Dämpfung',.3,6,.1],['Textgitter','gridScroll','Scrollen',0,4,.1],
- ['Darstellung','dropShrink','Tropfen in Bewegung',.3,1,.01],
+ ['Darstellung','dropShrink','Tropfen in Bewegung',.3,1,.01],['Darstellung','dropPerFontPx','Tropfen je Schriftpixel',.03,.15,.005],['Darstellung','dropMax','Größte Tropfen im Flug',3,8,.1],
 ];
 const physicsDefaults={...parameters};
 const TUNE_KEY='ms-tune';
