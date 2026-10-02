@@ -1,7 +1,8 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
 import {Fluid} from '../physics.mjs';
 import {FluidRenderer} from '../render.mjs';
-import {sampleGlyphs} from '../glyphs.mjs';
+import {sampleGlyphs,glyphMaterial,glyphLattice} from '../glyphs.mjs';
+import {matchPoints} from './match.mjs';
 import {restrain,sagWeight} from './coupling.mjs';
 
 const $=id=>document.getElementById(id);
@@ -33,16 +34,40 @@ const defaults={
  shakeGain:650,tiltGain:90,leanGain:120,
  // Flight between initials and headings: duration, viscosity and how much
  // harder the liquid is pulled to its target so it stands still at hand-over.
- morphMs:1100,morphViscosity:.7,morphHoming:3,
+ morphMs:1100,morphViscosity:.7,morphHoming:5,
+ // Extra pull toward the target while a flight settles (times morphHoming,
+ // growing with the calm phase), so even the finest drops arrive on time.
+ morphSettle:3,
  // Text grid: invisible strings every gridSpacing letter sizes that the
  // letters ride; their swing (stiffness, damping) and how hard scrolling
  // plucks them.
  gridSpacing:.2,gridStiffness:150,gridDamping:2.2,gridScroll:1.6,
  // Drops in motion may draw smaller than at rest (1 = full size).
  dropShrink:1,
- // In flight a particle's drop grows with the font size of its target word
- // (px per font px, capped at the initials' drop size).
- dropPerFontPx:.075,dropMax:5.5,
+ // In a page transition every moving drop reaches flightReach times as far
+ // as at rest, with a field of flightDensity times the strength: the liquid
+ // keeps the stroke weight of the type, and neighbouring drops still join
+ // into one connected liquid. Outside transitions the drops stay as they are.
+ // When the particle budget coarsens the lattice, the reach shrinks and the
+ // field strengthens with it, so the weight holds on phones as well.
+ flightReach:.9,flightDensity:.55,
+ // Share of a flight after which the liquid fades into its crisp resting
+ // look, and the share by which that is complete.
+ calmFrom:.7,calmTo:.92,
+ // Page transitions sample every font on its own lattice, sized from the
+ // measured stroke width: latticePerStroke lattice steps per stroke, within
+ // [latticeMin, latticeMax] px. Thin or small type thus flies as fine drops,
+ // bold and large type as fuller ones. dropScale sets the drawn drop against
+ // its lattice (1 = like the initials).
+ latticePerStroke:.6,latticeMin:.7,latticeMax:6,dropScale:1,
+ // How soon in a flight the drops reach their target size (share of it).
+ sizeLead:.35,
+ // Most particles a page transition may use (half on narrow screens).
+ // Flights skip neighbour forces, so this can be generous.
+ flightParticles:36000,
+ // Extra damping in flight (1/s): without neighbour friction the drops
+ // would otherwise swing past their targets.
+ morphDrag:26,
 };
 const tune={...defaults};
 const CALM_SPEED=25,LINE_LOAD_MAX=600,LINE_KICK_MAX=400;
@@ -171,7 +196,22 @@ function effects(t){
  else if(t>nextDrip){if(!reducedMotion.matches&&!pointer.down&&!burstUntil&&!intro.open&&calm())startDrip(t);else nextDrip=t+800;}
 }
 function scheduleRebuild(){clearTimeout(rebuildTimer);rebuildTimer=setTimeout(()=>rebuild(),120);}
-function draw(){if(renderer&&fluid){renderer.dropShrink=tune.dropShrink;renderer.draw(fluid);}}
+// 0 during a flight, rising smoothly to 1 between calmFrom and calmTo.
+function flightCalm(){
+ if(!transition?.ms)return 0;
+ const k=(performance.now()-transition.start)/transition.ms,c=Math.max(0,Math.min(1,(k-tune.calmFrom)/Math.max(.01,tune.calmTo-tune.calmFrom)));
+ return c*c*(3-2*c);
+}
+function draw(){
+ if(!renderer||!fluid)return;
+ // The thin flight look applies to every drop, only while a page changes.
+ // A lattice coarsened by the budget reaches less far with a stronger field.
+ const coarse=Math.sqrt(transition?.coarse||1);
+ renderer.dropShrink=tune.dropShrink;renderer.fine=transition?{from:1e4,to:1e4+1,grow:tune.flightReach/coarse,amp:tune.flightDensity*coarse*coarse}:{from:0,to:0,grow:1,amp:1};
+ // Toward the end of a flight the liquid settles into crisp type on cue.
+ renderer.calm=flightCalm();
+ renderer.draw(fluid);
+}
 function local(e){const r=canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
 function disturb(x,y,dx,dy,radius){if(fluid&&Math.abs(dx)+Math.abs(dy)>=.1)fluid.impulse(x,y,dx,dy,radius);}
 
@@ -225,17 +265,22 @@ function idleMotion(t){
 function frame(t){
  requestAnimationFrame(frame);
  if(document.hidden||(!isHome()&&!transition)){last=0;return;}
- const dt=last?Math.min(.04,(t-last)/1000):0;last=t;
+ // Flights are cheap (no neighbour forces) and must arrive on time, so they
+ // may catch up more simulated time per frame on a slow device.
+ const cap=transition?.1:.04;
+ const dt=last?Math.min(cap,(t-last)/1000):0;last=t;
  // The home line runs on the same clock as the liquid, so both can push each other.
  if(isHome()){homeLine?.step(dt,Math.min(LINE_LOAD_MAX,lineLoad)*tune.lineLoadGain,lineKick);lineKick=0;}
  if(!fluid||!renderer)return;
  settleMotion(t);
- accumulator=Math.min(.04,accumulator+dt);
+ accumulator=Math.min(cap,accumulator+dt);
  if(transition){
   // In flight between initials and heading: plain, thicker physics so the
   // liquid is calm when the real heading takes over; nothing else.
-  const flight={...parameters,viscosity:tune.morphViscosity,homing:tune.morphHoming};
-  while(accumulator>=1/120){fluid.step(1/120,flight,null);accumulator-=1/120;}
+  // Without neighbour forces and with strong drag, steps of 1/60 s stay
+  // stable, which halves the cost of the many fine drops.
+  const flight={...parameters,viscosity:tune.morphViscosity,homing:tune.morphHoming*(1+tune.morphSettle*flightCalm()),solo:true,drag:tune.morphDrag};
+  while(accumulator>=1/60){fluid.step(1/60,flight,null);accumulator-=1/60;}
   blendSizes(t);draw();return;
  }
  idleMotion(t);effects(t);
@@ -271,7 +316,7 @@ const LEAN_RELAX=2,NUDGE_LIMIT=260,SENSOR_TIMEOUT=300,SENSOR_WAIT=2500;
 const motion={active:false,gravity:null,pose:null,last:0,events:0,waiting:0};
 const debug=new URLSearchParams(location.search).has('debug')?Object.assign(document.body.appendChild(document.createElement('pre')),{className:'debug'}):null;
 // With ?debug the running simulation is reachable from the console for tuning.
-if(debug)window.liquidType={get fluid(){return fluid;},get drip(){return drip;},get parameters(){return parameters;},get motion(){return motion;}};
+if(debug)window.liquidType={get fluid(){return fluid;},get drip(){return drip;},get parameters(){return parameters;},get motion(){return motion;},get renderer(){return renderer;},get transition(){return transition;}};
 // Device frame (x right, y up in portrait) to canvas frame (x right, y down)
 // as the direction the liquid moves: opposite to the device's own acceleration.
 function liquidDirection(x,y){
@@ -342,8 +387,11 @@ const canMorph=()=>!!renderer&&!reducedMotion.matches&&!home.classList.contains(
 // drawing in page coordinates, which equal the liquid canvas coordinates.
 // Every word is placed where the browser laid it out, in its own font, so
 // wrapped headings and body text match line for line; null when not laid out.
+// A flight plays at the top of the page, so only words that start within the
+// first screen (and a little more) take part; the rest fades in with the page.
 function textShape(view){
  const panel=view.querySelector('.panel');if(!panel)return null;
+ const reach=innerHeight*1.15;
  const styles=new Map(),words=[],walker=document.createTreeWalker(panel,NodeFilter.SHOW_TEXT);
  for(let node=walker.nextNode();node;node=walker.nextNode()){
   const el=node.parentElement;if(!el||el.closest('.line'))continue;
@@ -352,23 +400,22 @@ function textShape(view){
   for(const m of node.data.matchAll(/\S+/g)){
    const range=document.createRange();range.setStart(node,m.index);range.setEnd(node,m.index+m[0].length);
    const r=range.getBoundingClientRect();
-   if(r.width>0&&r.height>0)words.push({text:style.upper?m[0].toUpperCase():m[0],x:r.left+scrollX,top:r.top+scrollY,width:r.width,height:r.height,style});
+   if(r.width>0&&r.height>0&&r.top+scrollY<reach)words.push({text:style.upper?m[0].toUpperCase():m[0],x:r.left+scrollX,top:r.top+scrollY,width:r.width,height:r.height,style});
   }
  }
  if(!words.length)return null;
- // Font size of the word at a page point, or of the nearest word.
- const fontAt=(x,y)=>{
-  let best=null,bestD=Infinity;
-  for(const w of words){
-   const dx=Math.max(w.x-x,0,x-w.x-w.width),dy=Math.max(w.top-y,0,y-w.top-w.height),d=dx*dx+dy*dy;
-   if(d<bestD){bestD=d;best=w;if(!d)break;}
-  }
-  return best.style.px;
- };
- return {fontAt,draw(g){
+ // Words grouped by font (size, weight, family), each with the box it occupies.
+ const groups=new Map();
+ for(const w of words){
+  const px=w.style.px,key=w.style.font;let gr=groups.get(key);
+  if(!gr){gr={key,px,box:{x0:Infinity,y0:Infinity,x1:-Infinity,y1:-Infinity}};groups.set(key,gr);}
+  const pad=px*.3;gr.box.x0=Math.min(gr.box.x0,w.x-pad);gr.box.y0=Math.min(gr.box.y0,w.top-pad);gr.box.x1=Math.max(gr.box.x1,w.x+w.width+pad);gr.box.y1=Math.max(gr.box.y1,w.top+w.height+pad);
+ }
+ return {groups:[...groups.values()],draw(g,onlyFont){
   g.fillStyle='black';g.textAlign='left';g.textBaseline='alphabetic';
   const metrics=new Map();
   for(const word of words){
+   if(onlyFont!==undefined&&word.style.font!==onlyFont)continue;
    const st=word.style;
    let mt=metrics.get(st);
    if(!mt){g.font=st.font;const m=g.measureText('M');mt={asc:m.fontBoundingBoxAscent,desc:m.fontBoundingBoxDescent};mt.ok=Number.isFinite(mt.asc)&&Number.isFinite(mt.desc);metrics.set(st,mt);}
@@ -379,7 +426,34 @@ function textShape(view){
 }
 const headingShape=textShape;
 const canvasOn=on=>{canvas.classList.toggle('is-off',!on);};
-const panelBudget=()=>w<700?2000:3200;
+const panelBudget=()=>Math.round(tune.flightParticles*(w<700?.5:1));
+// A whole text as liquid: every font on its own lattice, sized from its
+// stroke width, so thin type gets fine drops and bold or large type fuller
+// ones. Returns the points, each point's lattice (its drop size), the
+// finest lattice and the material texture.
+function sampleText(shape,budget){
+ const material=glyphMaterial(w,h,g=>shape.draw(g));
+ let scale=1,points=[],sizes=[];
+ for(let attempt=0;attempt<3;attempt++){
+  points=[];sizes=[];
+  for(const gr of shape.groups){
+   // Cells count by the pixel under their centre, so the liquid carries the
+   // type's own weight; a third covered is enough to keep thin stems whole.
+   const lattice=glyphLattice(w,h,g=>shape.draw(g,gr.key),stroke=>Math.max(tune.latticeMin,Math.min(tune.latticeMax,stroke*tune.latticePerStroke))*scale,{box:gr.box,threshold:80,faithful:true});
+   for(const p of lattice.points){points.push(p);sizes.push(lattice.spacing);}
+  }
+  if(points.length<=budget)break;
+  scale*=Math.sqrt(points.length/budget)*1.03;
+ }
+ // The flight's physics spacing (its springs' near zone) stays at least
+ // 1.5 px, so the finest drops still settle in time for the hand-over.
+ return {points,sizes:Float32Array.from(sizes,s=>s*tune.dropScale),spacing:Math.max(1.5,sizes.length?sizes.reduce((a,b)=>Math.min(a,b)):0),coarse:scale,material};
+}
+// The liquid canvas spans #views. A flight may reach further down than the
+// view on show (a long section on a phone), so #views is stretched for it.
+const viewsEl=document.getElementById('views');
+function reachDown(px){const need=Math.ceil(px);if(need>viewsEl.offsetHeight)viewsEl.style.minHeight=need+'px';return fitCanvas();}
+function releaseHeight(){viewsEl.style.minHeight='';}
 // Overlay the target view with its heading hidden, measure the heading.
 function stage(view){
  view.hidden=false;view.classList.add('is-active','is-arriving');
@@ -388,51 +462,59 @@ function stage(view){
  return shape;
 }
 function unstage(view){view.hidden=true;view.classList.remove('is-active','is-arriving');}
-// Shared tail of every morph into a non-home view: reveal, fade, hand over.
+// Shared tail of every morph into a non-home view: the real text fades in on
+// top of the settled liquid; the canvas only switches off once it is opaque.
 function handOver(fromView,view,focus){
  const t={finish(){
   for(const id of t.timers)clearTimeout(id);
   fromView.hidden=true;fromView.classList.remove('is-active','is-leaving');
   view.classList.remove('is-arriving','is-revealed');canvas.classList.remove('is-fading');canvasOn(false);
-  transition=null;layoutKey='';scheduleGrid();
+  transition=null;layoutKey='';releaseHeight();scheduleGrid();
   if(focus)view.querySelector('h2')?.focus({preventScroll:true});
  }};
- startTransition(t,tune.morphMs+FADE_MS);
- t.timers.push(setTimeout(()=>{if(transition===t){view.classList.add('is-revealed');canvas.classList.add('is-fading');}},tune.morphMs));
+ startTransition(t,tune.morphMs+FADE_MS+400);
+ t.timers.push(setTimeout(()=>{
+  if(transition!==t)return;
+  view.classList.add('is-revealed');
+  const panel=view.querySelector('.panel');
+  panel?.addEventListener('transitionend',e=>{if(e.target===panel&&transition===t)t.finish();},{once:true});
+ },tune.morphMs));
  return t;
 }
 function startTransition(t,ms){t.start=performance.now();t.ms=tune.morphMs;t.timers=[];transition=t;t.timers.push(setTimeout(()=>{if(transition===t)t.finish();},ms));}
-// Drop size for a particle whose word is set in a font of `px` pixels. A
-// drop's visible disc is about 1.75 times its size, so at 0.65 of the
-// lattice neighbouring drops still touch: small text stays a thin, joined
-// line rather than dust, large text gets full drops.
-const dropFor=(px,lattice)=>Math.max(lattice*.65,Math.min(tune.dropMax,px*tune.dropPerFontPx));
 // Per-particle drop sizes for a flight: `from` and `to` are arrays or one
-// number each; the drawn size blends between them over the flight.
-function flightSizes(t,from,to){
+// number each; the drawn size blends between them over the flight. `coarse`
+// is how far the particle budget coarsened the text lattice (1 = not at all).
+function flightSizes(t,from,to,coarse=1){
+ t.coarse=coarse;
  const n=fluid.n;t.sizeFrom=new Float32Array(n);t.sizeTo=new Float32Array(n);fluid.dropSize=new Float32Array(n);
  for(let i=0;i<n;i++){t.sizeFrom[i]=typeof from==='number'?from:from[i];t.sizeTo[i]=typeof to==='number'?to:to[i];fluid.dropSize[i]=t.sizeFrom[i];}
 }
 function blendSizes(now){
  const t=transition;if(!t?.sizeFrom||!fluid?.dropSize)return;
- const k=Math.min(1,(now-t.start)/t.ms),e=k*k*(3-2*k);
+ // With `t.way` (each drop's distance at the start), a drop takes its target
+ // size along its own way, so it never shrinks while still far apart from its
+ // neighbours. Otherwise ease out: the drops take their target size early.
+ if(t.way){for(let i=0;i<fluid.n;i++){const e=1-Math.min(1,Math.hypot(fluid.x[i]-fluid.tx[i],fluid.y[i]-fluid.ty[i])/t.way[i]);fluid.dropSize[i]=t.sizeFrom[i]+(t.sizeTo[i]-t.sizeFrom[i])*e;}return;}
+ const k=Math.min(1,(now-t.start)/(t.ms*tune.sizeLead)),e=1-(1-k)*(1-k);
  for(let i=0;i<fluid.n;i++)fluid.dropSize[i]=t.sizeFrom[i]+(t.sizeTo[i]-t.sizeFrom[i])*e;
 }
-const sizesOf=(sample,shape)=>Float32Array.from(sample.points,p=>dropFor(shape.fontAt(p.x,p.y),sample.spacing));
 // Home to a section: the initials, in whatever state they are, dissolve
 // into the section's heading.
 function morphForward(name,focus){
  if(!fluid?.n)return false;
  const view=views.get(name),shape=stage(view);
  if(!shape)return false;
- const old=fluid,sample=sampleGlyphs(w,h,g=>shape.draw(g),panelBudget());
- if(!sample.points.length){unstage(view);return false;}
+ if(!reachDown(view.offsetHeight)){unstage(view);releaseHeight();return false;}
+ const old=fluid,sample=sampleText(shape,panelBudget());
+ if(!sample.points.length){unstage(view);releaseHeight();return false;}
  current=name;chrome(name);window.scrollTo(0,0);
  home.classList.add('is-leaving');release({pointerId:pointer.id});magnetOn=false;drip=null;burstUntil=0;
  renderer.setMaterial(sample.material);
  fluid=new Fluid(sample.points,w,h,sample.spacing);
- for(let i=0;i<fluid.n;i++){const j=Math.min(old.n-1,Math.floor(i*old.n/fluid.n));fluid.x[i]=old.x[j];fluid.y[i]=old.y[j];fluid.vx[i]=old.vx[j]*.3;fluid.vy[i]=old.vy[j]*.3;}
- flightSizes(handOver(home,view,focus),old.spacing,sizesOf(sample,shape));
+ const from=Array.from({length:old.n},(_,j)=>({x:old.x[j],y:old.y[j]})),pair=matchPoints(from,sample.points);
+ for(let i=0;i<fluid.n;i++){const j=pair[i];fluid.x[i]=old.x[j];fluid.y[i]=old.y[j];fluid.vx[i]=old.vx[j]*.3;fluid.vy[i]=old.vy[j]*.3;}
+ flightSizes(handOver(home,view,focus),old.spacing,sample.sizes,sample.coarse);
  return true;
 }
 // Section to section, including project pages: the current heading flows
@@ -443,33 +525,39 @@ function morphBetween(from,name,focus){
  const view=views.get(name),dst=stage(view);
  if(!dst)return false;
  canvasOn(true);
- if(!fitCanvas()){unstage(view);canvasOn(false);return false;}
- const a=sampleGlyphs(w,h,g=>src.draw(g),panelBudget()),b=sampleGlyphs(w,h,g=>dst.draw(g),panelBudget());
- if(!a.points.length||!b.points.length){unstage(view);canvasOn(false);return false;}
+ if(!reachDown(Math.max(fromView.offsetHeight,view.offsetHeight))){unstage(view);canvasOn(false);releaseHeight();return false;}
+ const a=sampleText(src,panelBudget()),b=sampleText(dst,panelBudget());
+ if(!a.points.length||!b.points.length){unstage(view);canvasOn(false);releaseHeight();return false;}
  current=name;chrome(name);window.scrollTo(0,0);
  fromView.classList.add('is-leaving');
  renderer.setMaterial(b.material);
  fluid=new Fluid(b.points,w,h,b.spacing);
  const fromSizes=new Float32Array(fluid.n);
- for(let i=0;i<fluid.n;i++){const p=a.points[Math.floor(i*a.points.length/fluid.n)];fluid.x[i]=p.x;fluid.y[i]=p.y;fromSizes[i]=dropFor(src.fontAt(p.x,p.y),a.spacing);}
- flightSizes(handOver(fromView,view,focus),fromSizes,sizesOf(b,dst));
+ const pair=matchPoints(a.points,b.points);
+ for(let i=0;i<fluid.n;i++){const j=pair[i],p=a.points[j];fluid.x[i]=p.x;fluid.y[i]=p.y;fromSizes[i]=a.sizes[j];}
+ flightSizes(handOver(fromView,view,focus),fromSizes,b.sizes,Math.max(a.coarse,b.coarse));
  draw();
  return true;
 }
 // Returning home: a liquid of the heading's own density starts as the
-// heading and flows to the initials. The initials hold far more liquid than
-// a heading, so the full set of particles only takes over on arrival.
-function arriveFrom(shape){
- if(!renderer||!shape||!fitCanvas()){rebuild();scatter();return;}
+// text and flows to the initials. For the flight the initials are sampled
+// as finely as the text, so every drop has a target of its own and the
+// liquid stays fine all the way; the regular initials take over at rest.
+function arriveFrom({shape,height}){
+ if(!renderer||!shape||!reachDown(height)){releaseHeight();rebuild();scatter();return;}
  const layout=glyphLayout(),ms=sampleInitials(layout);
- const sample=sampleGlyphs(w,h,g=>shape.draw(g),panelBudget());
- if(!sample.points.length||!ms.points.length){rebuild();scatter();return;}
- fluid=new Fluid(sample.points,w,h,sample.spacing);
- for(let i=0;i<fluid.n;i++){const p=ms.points[Math.floor(i*ms.points.length/fluid.n)];fluid.tx[i]=p.x;fluid.ty[i]=p.y;}
+ const sample=sampleText(shape,panelBudget());
+ if(!sample.points.length||!ms.points.length){releaseHeight();rebuild();scatter();return;}
+ const fine=glyphLattice(w,h,g=>paint(g,layout),Math.max(tune.latticeMin,Math.min(ms.spacing,ms.spacing*Math.sqrt(ms.points.length/sample.points.length))),{threshold:80,faithful:true});
+ const targets=fine.points.length?fine.points:ms.points,size=fine.points.length?fine.spacing:ms.spacing;
+ fluid=new Fluid(sample.points,w,h,Math.max(1.5,size));
+ const pair=matchPoints(targets,sample.points);
+ for(let i=0;i<fluid.n;i++){const p=targets[pair[i]];fluid.tx[i]=p.x;fluid.ty[i]=p.y;}
  renderer.setMaterial(ms.material);layoutKey='';
- const t={finish(){for(const id of t.timers)clearTimeout(id);transition=null;rebuild(true);}};
+ const t={finish(){for(const id of t.timers)clearTimeout(id);transition=null;releaseHeight();rebuild(true);}};
  startTransition(t,tune.morphMs);
- flightSizes(t,sizesOf(sample,shape),ms.spacing);
+ flightSizes(t,sample.sizes,size*tune.dropScale,sample.coarse);
+ t.way=Float32Array.from({length:fluid.n},(_,i)=>Math.max(1,Math.hypot(fluid.x[i]-fluid.tx[i],fluid.y[i]-fluid.ty[i])));
  idleSince=performance.now();
 }
 function show(name,focus=true){
@@ -479,7 +567,7 @@ function show(name,focus=true){
  const from=current;
  if(canMorph()&&from&&from!=='home'&&name!=='home'&&morphBetween(from,name,focus))return;
  if(canMorph()&&from==='home'&&name!=='home'&&morphForward(name,focus))return;
- homeEntry=canMorph()&&name==='home'&&from&&from!=='home'?headingShape(views.get(from)):null;
+ homeEntry=canMorph()&&name==='home'&&from&&from!=='home'?{shape:headingShape(views.get(from)),height:views.get(from).offsetHeight}:null;
  plainShow(name,focus);
 }
 function plainShow(name,focus){
@@ -489,7 +577,7 @@ function plainShow(name,focus){
  if(name==='home'){
   release({pointerId:pointer.id});last=0;idleSince=performance.now();resetMotion();
   const entry=homeEntry;homeEntry=null;
-  requestAnimationFrame(()=>{if(entry)arriveFrom(entry);else{rebuild();scatter();}});
+  requestAnimationFrame(()=>{if(entry?.shape)arriveFrom(entry);else{rebuild();scatter();}});
  }
  scheduleGrid();
  if(focus)(name==='home'?letters[0]:views.get(name).querySelector('h2'))?.focus({preventScroll:true});
@@ -516,9 +604,10 @@ const TUNE=[
  ['Linie','lineLoadGain','Last',0,150,1],['Linie','lineImpactGain','Aufprall',0,.15,.005],
  ['Ruhebewegung','idleDelay','Verzögerung (ms)',1000,15000,100],['Ruhebewegung','idleForce','Kraft',0,4,.1],
  ['Sensoren','shakeGain','Schütteln',0,2000,10],['Sensoren','tiltGain','Kippen',0,300,1],['Sensoren','leanGain','Neigen (Schwerkraft)',0,500,5],
- ['Übergang','morphMs','Flugzeit (ms)',300,2500,50],['Übergang','morphViscosity','Zähigkeit im Flug',0,1,.01],['Übergang','morphHoming','Zug zum Ziel',1,6,.1],
+ ['Übergang','morphMs','Flugzeit (ms)',300,2500,50],['Übergang','morphViscosity','Zähigkeit im Flug',0,1,.01],['Übergang','morphHoming','Zug zum Ziel',1,6,.1],['Übergang','morphSettle','Nachziehen am Ende',0,6,.1],
  ['Textgitter','gridSpacing','Abstand',.1,.4,.01],['Textgitter','gridStiffness','Schwingung',30,600,5],['Textgitter','gridDamping','Dämpfung',.3,6,.1],['Textgitter','gridScroll','Scrollen',0,4,.1],
- ['Darstellung','dropShrink','Tropfen in Bewegung',.3,1,.01],['Darstellung','dropPerFontPx','Tropfen je Schriftpixel',.03,.15,.005],['Darstellung','dropMax','Größte Tropfen im Flug',3,8,.1],
+ ['Darstellung','dropShrink','Tropfen in Bewegung',.3,1,.01],
+ ['Übergang','latticePerStroke','Raster je Strichstärke',.3,1.5,.05],['Übergang','latticeMin','Feinstes Raster',.5,3,.05],['Übergang','latticeMax','Gröbstes Raster',2,10,.1],['Übergang','calmFrom','Beruhigung ab (Anteil)',.3,1,.01],['Übergang','calmTo','Beruhigung bis (Anteil)',.4,1,.01],['Übergang','dropScale','Tropfengröße',.5,1.5,.05],['Übergang','sizeLead','Größenwechsel',.1,1,.05],['Übergang','flightParticles','Partikel im Flug',2000,40000,500],['Übergang','morphDrag','Dämpfung im Flug',0,40,.5],['Darstellung','flightReach','Reichweite im Flug',.3,1.5,.01],['Darstellung','flightDensity','Dichte im Flug',.2,2,.01],
 ];
 const physicsDefaults={...parameters};
 const TUNE_KEY='ms-tune';

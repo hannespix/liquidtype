@@ -60,3 +60,25 @@ test('homing pulls displaced liquid home sooner, default is unchanged',()=>{
  for(let i=0;i<30;i++){a.step(1/120,params);b.step(1/120,{...params,homing:1});}
  assert.equal(a.x[0],b.x[0]);
 });
+test('solo particles ignore their neighbours but still return home',()=>{
+ const pair=solo=>{const f=new Fluid([{x:200,y:200},{x:206,y:200}],800,500,6);f.x[0]+=2;f.step(1/120,{...params,solo});return f.vx[1];};
+ assert.notEqual(pair(false),0,'neighbour feels the push');assert.equal(pair(true),0,'solo neighbour does not');
+ const f=new Fluid([{x:200,y:200}],800,500,6);f.x[0]+=80;for(let i=0;i<900;i++)f.step(1/120,{...params,solo:true,homing:3});
+ assert.ok(Math.abs(f.x[0]-200)<.5);
+});
+test('drag lets a solo particle arrive without overshooting',()=>{
+ const run=drag=>{const f=new Fluid([{x:200,y:200}],800,500,2.5);f.x[0]+=150;let min=Infinity;for(let i=0;i<144;i++){f.step(1/120,{...params,solo:true,homing:5,drag});min=Math.min(min,f.x[0]);}return {overshoot:200-min,end:Math.abs(f.x[0]-200)};};
+ const loose=run(0),damped=run(26);
+ assert.ok(loose.overshoot>20,`undamped overshoots: ${loose.overshoot}`);
+ assert.ok(damped.overshoot<2,`damped barely overshoots: ${damped.overshoot}`);
+ assert.ok(damped.end<1.5,`and is home within 1.2 s: ${damped.end}`);
+});
+test('solo flights converge the same with large steps',()=>{
+ // Page flights step at 1/60 s; with drag they must stay stable and arrive.
+ const f=new Fluid([{x:200,y:200},{x:204,y:200}],800,500,1.5);
+ f.x[0]+=180;f.y[1]-=150;
+ const p={...params,homing:5,solo:true,drag:26};
+ for(let i=0;i<66;i++)f.step(1/60,{...p,homing:i>46?20:5});
+ assert.ok(Math.hypot(f.x[0]-200,f.y[0]-200)<1,`first ${f.x[0]},${f.y[0]}`);
+ assert.ok(Math.hypot(f.x[1]-204,f.y[1]-200)<1,`second ${f.x[1]},${f.y[1]}`);
+});

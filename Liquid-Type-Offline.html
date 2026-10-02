@@ -85,20 +85,24 @@ class Fluid {
  // Optional p.gravityX / p.gravityY (px/s²) apply a uniform external force,
  // for example from a phone's tilt and shake. Zero or missing means none.
  // Optional p.homing scales the spring toward the glyph (1 = as designed).
+ // Optional p.solo skips all neighbour forces: every particle only follows
+ // its own spring, which is cheap enough for many thousands of particles.
+ // Optional p.drag (1/s) adds damping, e.g. to replace the inner friction
+ // that solo particles lack so they arrive without overshooting.
  step(dt,p,pointer=null){
   dt=Math.max(0,Math.min(1/60,dt));if(!dt)return;this.time+=dt;
   const {n,x,y,vx,vy,ax,ay,tx,ty,free,h,cols,rows,head,next,spacing:s}=this;
   const gx=p.gravityX||0,gy=p.gravityY||0,drip=p.dripGravity||0,homing=p.homing||1;
-  head.fill(-1);
+  const solo=!!p.solo;if(!solo)head.fill(-1);
   const brush=pointer?.down?pointer:null;
   for(let i=0;i<n;i++){
-   const c=Math.max(0,Math.min(cols-1,Math.floor(x[i]/h))),r=Math.max(0,Math.min(rows-1,Math.floor(y[i]/h)));const k=c+r*cols;next[i]=head[k];head[k]=i;
+   if(!solo){const c=Math.max(0,Math.min(cols-1,Math.floor(x[i]/h))),r=Math.max(0,Math.min(rows-1,Math.floor(y[i]/h)));const k=c+r*cols;next[i]=head[k];head[k]=i;}
    const b=brush?Math.max(0,1-Math.hypot(x[i]-brush.x,y[i]-brush.y)/brush.radius):0;
    const homeDistance=Math.hypot(tx[i]-x[i],ty[i]-y[i]);
    const spring=(22+230*Math.exp(-homeDistance*homeDistance/(s*s*12)))*homing*(1-.98*b)*(1-free[i]);ax[i]=(tx[i]-x[i])*spring;ay[i]=(ty[i]-y[i])*spring+drip*free[i];
    if(brush){ax[i]+=(brush.x-x[i])*b*22*p.strength;ay[i]+=(brush.y-y[i])*b*22*p.strength;}
   }
-  for(let i=0;i<n;i++){
+  for(let i=0;i<(solo?0:n);i++){
    const c=Math.floor(x[i]/h),r=Math.floor(y[i]/h);
    for(let ry=Math.max(0,r-1);ry<=Math.min(rows-1,r+1);ry++)for(let cx=Math.max(0,c-1);cx<=Math.min(cols-1,c+1);cx++){
     for(let j=head[cx+ry*cols];j!==-1;j=next[j]){
@@ -121,7 +125,7 @@ class Fluid {
     }
    }
   }
-  const damping=Math.exp(-(1.05+p.viscosity*3.4)*dt);
+  const damping=Math.exp(-(1.05+p.viscosity*3.4+(p.drag||0))*dt);
   for(let i=0;i<n;i++){
    vx[i]=Math.max(-1600,Math.min(1600,(vx[i]+(ax[i]+gx)*dt)*damping));vy[i]=Math.max(-1600,Math.min(1600,(vy[i]+(ay[i]+gy)*dt)*damping));
    x[i]+=vx[i]*dt;y[i]+=vy[i]*dt;
@@ -141,11 +145,26 @@ in float size;
 uniform vec2 resolution;
 uniform float pointScale;
 uniform float maxPoint;
+uniform vec3 fine;
 out vec2 materialHome;
 out vec2 currentPosition;
 out float strain;
 out float dropRadius;
-void main(){materialHome=home;currentPosition=position;strain=deformation;dropRadius=size*2.1;gl_Position=vec4(position/resolution*vec2(2.,-2.)+vec2(-1.,1.),0.,1.);gl_PointSize=min(maxPoint,size*pointScale);}`;
+out float amplitude;
+// fine = (size up to which a drop counts as fine, size from which it counts
+// as coarse, reach growth in motion). A fine drop in motion reaches further
+// with a weaker field, so it stays a thin line yet joins its neighbours
+// into connected liquid instead of separate dots. Coarse drops are untouched.
+uniform float fineAmp;
+void main(){
+ materialHome=home;currentPosition=position;strain=deformation;
+ // The fine look holds until a drop is nearly home, so settling type never
+ // swells: by the time the reach returns, the crisp material look leads.
+ float f=1.-smoothstep(fine.x,fine.y,size),moving=smoothstep(.02,.3,deformation);
+ float grow=mix(1.,fine.z,f*moving);
+ dropRadius=size*2.1*grow;amplitude=mix(1.,fineAmp,f*moving);
+ gl_Position=vec4(position/resolution*vec2(2.,-2.)+vec2(-1.,1.),0.,1.);gl_PointSize=min(maxPoint,size*pointScale*grow);
+}`;
 const drop=`#version 300 es
 precision highp float;
 uniform sampler2D glyphMaterial;
@@ -156,6 +175,7 @@ uniform vec2 pixelScale;
 uniform float shrink;
 in float strain;
 in float dropRadius;
+in float amplitude;
 out vec4 color;
 void main(){
  vec2 pixel=vec2(gl_FragCoord.x/pixelScale.x,resolution.y-gl_FragCoord.y/pixelScale.y);
@@ -167,7 +187,7 @@ void main(){
  // Smooth, overlapping material kernels: there are no rectangular cells or
  // hard support edges. Normalize their coverage in the surface reconstruction.
  float ink=texture(glyphMaterial,(materialHome+offset)/resolution).a;
- float kernel=.16*pow(max(0.,1.-d),3.);
+ float kernel=.16*amplitude*pow(max(0.,1.-d),3.);
  color=vec4(kernel*mix(ink,1.,shape),kernel,kernel*shape,0.);
 
 }`;
@@ -199,8 +219,13 @@ void main(){
 class FluidRenderer {
  // Colours are linear 0..1 RGB triples; the defaults match the main Liquid Type page.
  // dropShrink (0..1) scales drops that are in motion; 1 keeps them full size.
- constructor(canvas,{paper=[.973,.973,.957],ink=[.016,.020,.019],dropShrink=1}={}){
-  this.paper=paper;this.ink=ink;this.dropShrink=dropShrink;
+ // fine = {from,to,grow,amp}: drops smaller than `from` (fading out by `to`)
+ // reach `grow` times further in motion with a field of strength `amp`;
+ // grow 1 and amp 1 leave every drop as designed.
+ // calm (0..1) ignores a drop's leftover speed for its look, e.g. at the end
+ // of a page transition; 0 leaves motion visible.
+ constructor(canvas,{paper=[.973,.973,.957],ink=[.016,.020,.019],dropShrink=1,fine={from:0,to:0,grow:1,amp:1},calm=0}={}){
+  this.paper=paper;this.ink=ink;this.dropShrink=dropShrink;this.fine=fine;this.calm=calm;
   const gl=canvas.getContext('webgl2',{alpha:false,antialias:false,powerPreference:'high-performance',depth:false,stencil:false});
   if(!gl)throw new Error('WebGL2 ist auf diesem Gerät nicht verfügbar.');
   this.gl=gl;this.canvas=canvas;this.floatSurface=!!gl.getExtension('EXT_color_buffer_float');
@@ -233,17 +258,22 @@ class FluidRenderer {
  draw(fluid,dropSpacing=fluid.spacing){
   const gl=this.gl;if(gl.isContextLost())return;
   if(this.data.length!==fluid.n*6)this.data=new Float32Array(fluid.n*6);
-  const sizes=fluid.dropSize;
+  const sizes=fluid.dropSize,stir=1-Math.max(0,Math.min(1,this.calm));
   for(let i=0;i<fluid.n;i++){
    const k=i*6;this.data[k]=fluid.x[i];this.data[k+1]=fluid.y[i];this.data[k+2]=fluid.tx[i];this.data[k+3]=fluid.ty[i];
-   this.data[k+4]=Math.hypot(fluid.x[i]-fluid.tx[i],fluid.y[i]-fluid.ty[i])/fluid.spacing+Math.hypot(fluid.vx[i],fluid.vy[i])/(fluid.spacing*12);
-   this.data[k+5]=sizes?sizes[i]:dropSpacing;
+   // Deformation is measured against the drop's own size, so a large drop
+   // near home already looks at rest while a fine one still flows. calm
+   // quiets leftover jitter and sub-pixel offsets; a drop still clearly away
+   // from home keeps its liquid look, so it never draws the type shifted.
+   const size=sizes?sizes[i]:dropSpacing,unit=sizes?Math.max(fluid.spacing,size):fluid.spacing;
+   this.data[k+4]=Math.hypot(fluid.x[i]-fluid.tx[i],fluid.y[i]-fluid.ty[i])/(unit*(3-2*stir))+Math.hypot(fluid.vx[i],fluid.vy[i])/(unit*12)*stir;
+   this.data[k+5]=size;
   }
   gl.viewport(0,0,this.canvas.width,this.canvas.height);
   gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbo);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
   gl.useProgram(this.points);gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,this.data,gl.DYNAMIC_DRAW);
   gl.uniform2f(gl.getUniformLocation(this.points,'resolution'),this.w,this.h);gl.uniform1f(gl.getUniformLocation(this.points,'pointScale'),4.2*this.scale);gl.uniform1f(gl.getUniformLocation(this.points,'maxPoint'),this.maxPointSize);
-  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.uniform1i(gl.getUniformLocation(this.points,'glyphMaterial'),1);gl.uniform2f(gl.getUniformLocation(this.points,'pixelScale'),this.canvas.width/this.w,this.canvas.height/this.h);gl.uniform1f(gl.getUniformLocation(this.points,'shrink'),this.dropShrink);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.uniform1i(gl.getUniformLocation(this.points,'glyphMaterial'),1);gl.uniform2f(gl.getUniformLocation(this.points,'pixelScale'),this.canvas.width/this.w,this.canvas.height/this.h);gl.uniform1f(gl.getUniformLocation(this.points,'shrink'),this.dropShrink);gl.uniform3f(gl.getUniformLocation(this.points,'fine'),this.fine.from,Math.max(this.fine.to,this.fine.from+.001),this.fine.grow);gl.uniform1f(gl.getUniformLocation(this.points,'fineAmp'),this.fine.amp);
   gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE);gl.drawArrays(gl.POINTS,0,fluid.n);gl.disable(gl.BLEND);
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.useProgram(this.surface);gl.bindVertexArray(null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.texture);
   gl.uniform1i(gl.getUniformLocation(this.surface,'density'),0);gl.uniform2f(gl.getUniformLocation(this.surface,'texel'),1/this.canvas.width,1/this.canvas.height);gl.uniform3fv(gl.getUniformLocation(this.surface,'paper'),this.paper);gl.uniform3fv(gl.getUniformLocation(this.surface,'ink'),this.ink);gl.drawArrays(gl.TRIANGLES,0,3);
@@ -252,6 +282,65 @@ class FluidRenderer {
 
 
 // Glyph sampling shared by every Liquid Type page.
+
+// One particle per lattice cell that holds ink above `threshold` (alpha 0-255).
+// `rgba` covers the rectangle starting at (ox,oy) with a row width of `stride`.
+// With `centre`, only the pixel under the cell's centre counts: the cells
+// then cover the same area as the ink instead of a rim of one cell around it.
+function latticeScan(rgba,stride,ox,oy,x0,y0,x1,y1,spacing,threshold,centre=false){
+ const points=[];
+ for(let y=y0;y<y1;y+=spacing)for(let x=x0;x<x1;x+=spacing){
+  if(centre){
+   const cx=Math.min(x1-1,Math.floor(x+spacing*.5)),cy=Math.min(y1-1,Math.floor(y+spacing*.5));
+   if(rgba[((cy-oy)*stride+(cx-ox))*4+3]>threshold)points.push({x:x+spacing*.5,y:y+spacing*.5});
+   continue;
+  }
+  let ink=false;
+  for(let yy=Math.floor(y);yy<Math.min(y1,y+spacing)&&!ink;yy++)for(let xx=Math.floor(x);xx<Math.min(x1,x+spacing);xx++){
+   if(rgba[((yy-oy)*stride+(xx-ox))*4+3]>threshold){ink=true;break;}
+  }
+  if(ink)points.push({x:x+spacing*.5,y:y+spacing*.5});
+ }
+ return points;
+}
+// High-resolution coverage used by the renderer as material texture.
+function glyphMaterial(width,height,draw){
+ const material=document.createElement('canvas');const scale=Math.min(devicePixelRatio||1,2);material.width=Math.ceil(width*scale);material.height=Math.ceil(height*scale);
+ const mc=material.getContext('2d');mc.scale(material.width/width,material.height/height);draw(mc);
+ return material;
+}
+// Mean stroke width of the ink in px: twice its area over its outline length.
+// Thin and light type measures less than bold or large type.
+function strokeWidth(rgba,stride,rows){
+ let area=0,edge=0;
+ for(let y=0;y<rows;y++)for(let x=0;x<stride;x++){
+  const k=(y*stride+x)*4+3,a=rgba[k]/255;area+=a;
+  const right=x+1<stride?rgba[k+4]/255:0,below=y+1<rows?rgba[k+stride*4]/255:0;
+  edge+=Math.hypot(right-a,below-a);
+ }
+ return edge>0?2*area/edge:0;
+}
+// Particles on a fixed lattice, optionally only inside `box` {x0,y0,x1,y1}.
+// `spacing` is a number or a function of the ink's stroke width, so the
+// lattice can follow the weight of the type. With `faithful`, a lattice no
+// coarser than the strokes takes cells by their centre, so the particles
+// carry the type's own weight (every stroke still crosses a cell centre).
+// Returns the points, the spacing used and the stroke width. One scratch
+// canvas is reused; only the box is cleared and read back.
+let latticeCanvas=null;
+function glyphLattice(width,height,draw,spacing,{box=null,threshold=0,faithful=false}={}){
+ const cw=Math.ceil(width),ch=Math.ceil(height);
+ if(!latticeCanvas||latticeCanvas.width<cw||latticeCanvas.height<ch){latticeCanvas=document.createElement('canvas');latticeCanvas.width=cw;latticeCanvas.height=ch;}
+ const ctx=latticeCanvas.getContext('2d',{willReadFrequently:true});
+ const x0=Math.max(0,Math.floor(box?box.x0:0)),y0=Math.max(0,Math.floor(box?box.y0:0));
+ const x1=Math.min(width,Math.ceil(box?box.x1:width)),y1=Math.min(height,Math.ceil(box?box.y1:height));
+ if(x1<=x0||y1<=y0)return {points:[],spacing:typeof spacing==='number'?spacing:0,stroke:0};
+ ctx.clearRect(x0,y0,x1-x0,y1-y0);ctx.save();draw(ctx);ctx.restore();
+ const rgba=ctx.getImageData(x0,y0,x1-x0,y1-y0).data;
+ const stroke=typeof spacing==='number'&&!faithful?0:strokeWidth(rgba,x1-x0,y1-y0);
+ const s=typeof spacing==='number'?spacing:spacing(stroke);
+ return {points:latticeScan(rgba,x1-x0,x0,y0,x0,y0,x1,y1,s,threshold,faithful&&s<=stroke),spacing:s,stroke};
+}
 // `draw(ctx)` paints the ink in CSS pixels; it is called twice: once on a 1x
 // canvas whose coverage becomes the particle lattice, and once on a
 // high-resolution canvas that the renderer uses as material texture.
@@ -260,22 +349,14 @@ function sampleGlyphs(width,height,draw,budget){
  const ctx=c.getContext('2d',{willReadFrequently:true});draw(ctx);
  // High-resolution glyph coverage is material data for the particles, never a
  // screen-space text image, SVG overlay, opacity layer or alternative renderer.
- const material=document.createElement('canvas');const scale=Math.min(devicePixelRatio||1,2);material.width=Math.ceil(width*scale);material.height=Math.ceil(height*scale);
- const mc=material.getContext('2d');mc.scale(material.width/width,material.height/height);draw(mc);
+ const material=glyphMaterial(width,height,draw);
  const rgba=ctx.getImageData(0,0,c.width,c.height).data;
  let area=0;for(let i=3;i<rgba.length;i+=4)area+=rgba[i]/255;
  let spacing=Math.max(2.5,Math.sqrt(area/(budget*.8)));
  let points=[];
  // Keep a complete lattice cell for every ink intersection, including fine serifs.
  for(let attempt=0;attempt<3;attempt++){
-  points=[];
-  for(let y=0;y<height;y+=spacing)for(let x=0;x<width;x+=spacing){
-   let ink=false;
-   for(let yy=Math.floor(y);yy<Math.min(height,y+spacing)&&!ink;yy++)for(let xx=Math.floor(x);xx<Math.min(width,x+spacing);xx++){
-    if(rgba[(yy*c.width+xx)*4+3]>0){ink=true;break;}
-   }
-   if(ink)points.push({x:x+spacing*.5,y:y+spacing*.5});
-  }
+  points=latticeScan(rgba,c.width,0,0,0,0,width,height,spacing,0);
   if(points.length<=budget)break;spacing*=Math.sqrt(points.length/budget)*1.03;
  }
  return {points,spacing,material};

@@ -7,11 +7,26 @@ in float size;
 uniform vec2 resolution;
 uniform float pointScale;
 uniform float maxPoint;
+uniform vec3 fine;
 out vec2 materialHome;
 out vec2 currentPosition;
 out float strain;
 out float dropRadius;
-void main(){materialHome=home;currentPosition=position;strain=deformation;dropRadius=size*2.1;gl_Position=vec4(position/resolution*vec2(2.,-2.)+vec2(-1.,1.),0.,1.);gl_PointSize=min(maxPoint,size*pointScale);}`;
+out float amplitude;
+// fine = (size up to which a drop counts as fine, size from which it counts
+// as coarse, reach growth in motion). A fine drop in motion reaches further
+// with a weaker field, so it stays a thin line yet joins its neighbours
+// into connected liquid instead of separate dots. Coarse drops are untouched.
+uniform float fineAmp;
+void main(){
+ materialHome=home;currentPosition=position;strain=deformation;
+ // The fine look holds until a drop is nearly home, so settling type never
+ // swells: by the time the reach returns, the crisp material look leads.
+ float f=1.-smoothstep(fine.x,fine.y,size),moving=smoothstep(.02,.3,deformation);
+ float grow=mix(1.,fine.z,f*moving);
+ dropRadius=size*2.1*grow;amplitude=mix(1.,fineAmp,f*moving);
+ gl_Position=vec4(position/resolution*vec2(2.,-2.)+vec2(-1.,1.),0.,1.);gl_PointSize=min(maxPoint,size*pointScale*grow);
+}`;
 const drop=`#version 300 es
 precision highp float;
 uniform sampler2D glyphMaterial;
@@ -22,6 +37,7 @@ uniform vec2 pixelScale;
 uniform float shrink;
 in float strain;
 in float dropRadius;
+in float amplitude;
 out vec4 color;
 void main(){
  vec2 pixel=vec2(gl_FragCoord.x/pixelScale.x,resolution.y-gl_FragCoord.y/pixelScale.y);
@@ -33,7 +49,7 @@ void main(){
  // Smooth, overlapping material kernels: there are no rectangular cells or
  // hard support edges. Normalize their coverage in the surface reconstruction.
  float ink=texture(glyphMaterial,(materialHome+offset)/resolution).a;
- float kernel=.16*pow(max(0.,1.-d),3.);
+ float kernel=.16*amplitude*pow(max(0.,1.-d),3.);
  color=vec4(kernel*mix(ink,1.,shape),kernel,kernel*shape,0.);
 
 }`;
@@ -65,8 +81,13 @@ void main(){
 export class FluidRenderer {
  // Colours are linear 0..1 RGB triples; the defaults match the main Liquid Type page.
  // dropShrink (0..1) scales drops that are in motion; 1 keeps them full size.
- constructor(canvas,{paper=[.973,.973,.957],ink=[.016,.020,.019],dropShrink=1}={}){
-  this.paper=paper;this.ink=ink;this.dropShrink=dropShrink;
+ // fine = {from,to,grow,amp}: drops smaller than `from` (fading out by `to`)
+ // reach `grow` times further in motion with a field of strength `amp`;
+ // grow 1 and amp 1 leave every drop as designed.
+ // calm (0..1) ignores a drop's leftover speed for its look, e.g. at the end
+ // of a page transition; 0 leaves motion visible.
+ constructor(canvas,{paper=[.973,.973,.957],ink=[.016,.020,.019],dropShrink=1,fine={from:0,to:0,grow:1,amp:1},calm=0}={}){
+  this.paper=paper;this.ink=ink;this.dropShrink=dropShrink;this.fine=fine;this.calm=calm;
   const gl=canvas.getContext('webgl2',{alpha:false,antialias:false,powerPreference:'high-performance',depth:false,stencil:false});
   if(!gl)throw new Error('WebGL2 ist auf diesem Gerät nicht verfügbar.');
   this.gl=gl;this.canvas=canvas;this.floatSurface=!!gl.getExtension('EXT_color_buffer_float');
@@ -99,17 +120,22 @@ export class FluidRenderer {
  draw(fluid,dropSpacing=fluid.spacing){
   const gl=this.gl;if(gl.isContextLost())return;
   if(this.data.length!==fluid.n*6)this.data=new Float32Array(fluid.n*6);
-  const sizes=fluid.dropSize;
+  const sizes=fluid.dropSize,stir=1-Math.max(0,Math.min(1,this.calm));
   for(let i=0;i<fluid.n;i++){
    const k=i*6;this.data[k]=fluid.x[i];this.data[k+1]=fluid.y[i];this.data[k+2]=fluid.tx[i];this.data[k+3]=fluid.ty[i];
-   this.data[k+4]=Math.hypot(fluid.x[i]-fluid.tx[i],fluid.y[i]-fluid.ty[i])/fluid.spacing+Math.hypot(fluid.vx[i],fluid.vy[i])/(fluid.spacing*12);
-   this.data[k+5]=sizes?sizes[i]:dropSpacing;
+   // Deformation is measured against the drop's own size, so a large drop
+   // near home already looks at rest while a fine one still flows. calm
+   // quiets leftover jitter and sub-pixel offsets; a drop still clearly away
+   // from home keeps its liquid look, so it never draws the type shifted.
+   const size=sizes?sizes[i]:dropSpacing,unit=sizes?Math.max(fluid.spacing,size):fluid.spacing;
+   this.data[k+4]=Math.hypot(fluid.x[i]-fluid.tx[i],fluid.y[i]-fluid.ty[i])/(unit*(3-2*stir))+Math.hypot(fluid.vx[i],fluid.vy[i])/(unit*12)*stir;
+   this.data[k+5]=size;
   }
   gl.viewport(0,0,this.canvas.width,this.canvas.height);
   gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbo);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
   gl.useProgram(this.points);gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,this.data,gl.DYNAMIC_DRAW);
   gl.uniform2f(gl.getUniformLocation(this.points,'resolution'),this.w,this.h);gl.uniform1f(gl.getUniformLocation(this.points,'pointScale'),4.2*this.scale);gl.uniform1f(gl.getUniformLocation(this.points,'maxPoint'),this.maxPointSize);
-  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.uniform1i(gl.getUniformLocation(this.points,'glyphMaterial'),1);gl.uniform2f(gl.getUniformLocation(this.points,'pixelScale'),this.canvas.width/this.w,this.canvas.height/this.h);gl.uniform1f(gl.getUniformLocation(this.points,'shrink'),this.dropShrink);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.uniform1i(gl.getUniformLocation(this.points,'glyphMaterial'),1);gl.uniform2f(gl.getUniformLocation(this.points,'pixelScale'),this.canvas.width/this.w,this.canvas.height/this.h);gl.uniform1f(gl.getUniformLocation(this.points,'shrink'),this.dropShrink);gl.uniform3f(gl.getUniformLocation(this.points,'fine'),this.fine.from,Math.max(this.fine.to,this.fine.from+.001),this.fine.grow);gl.uniform1f(gl.getUniformLocation(this.points,'fineAmp'),this.fine.amp);
   gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE);gl.drawArrays(gl.POINTS,0,fluid.n);gl.disable(gl.BLEND);
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.useProgram(this.surface);gl.bindVertexArray(null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.texture);
   gl.uniform1i(gl.getUniformLocation(this.surface,'density'),0);gl.uniform2f(gl.getUniformLocation(this.surface,'texel'),1/this.canvas.width,1/this.canvas.height);gl.uniform3fv(gl.getUniformLocation(this.surface,'paper'),this.paper);gl.uniform3fv(gl.getUniformLocation(this.surface,'ink'),this.ink);gl.drawArrays(gl.TRIANGLES,0,3);
