@@ -29,23 +29,24 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 
 /* Views */
 #views{position:relative}
-.view{min-height:100vh;min-height:100dvh;padding:clamp(4rem,10vw,7rem) clamp(1.25rem,6vw,5rem);display:none}
+.view{position:relative;z-index:1;min-height:100vh;min-height:100dvh;padding:clamp(4rem,10vw,7rem) clamp(1.25rem,6vw,5rem);display:none}
 .view.is-active{display:flex;align-items:center;justify-content:center;animation:enter .45s var(--ease)}
 @keyframes enter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 /* Liquid hand-over: the target view lies over the home view while the
    initials flow into its heading; then heading and text take over. */
 .view.is-arriving{position:absolute;top:0;left:0;right:0;z-index:2;animation:none}
-.view.is-arriving .panel h2{visibility:hidden}
-.view.is-arriving .panel>:not(h2){opacity:0;transition:opacity .4s var(--ease)}
-.view.is-arriving.is-revealed .panel h2{visibility:visible}
-.view.is-arriving.is-revealed .panel>:not(h2){opacity:1}
+.view.is-arriving .panel{opacity:0}
+.view.is-arriving.is-revealed .panel{opacity:1;transition:opacity .35s var(--ease)}
 .view-home.is-leaving .home,.view-home.is-leaving .credit{opacity:0;transition:opacity .25s}
+.view.is-leaving .panel{opacity:0}
 .liquid{transition:opacity .35s var(--ease)}
 .liquid.is-fading{opacity:0}
 
 /* Home with liquid initials */
-.view-home{position:relative;overflow:clip;min-height:100svh}
+.view-home{overflow:clip;min-height:100svh}
+/* One liquid layer under every view, so headings can flow into each other. */
 .liquid{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:0}
+.liquid.is-off{display:none}
 .home{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;text-align:center;max-width:100%}
 .initials{margin:0;display:flex;justify-content:center;gap:.1em;font:700 clamp(7rem,40vw,22rem)/.82 var(--serif);touch-action:none;-webkit-user-select:none;user-select:none}
 .initial{display:block;font:inherit;line-height:inherit;color:transparent;cursor:pointer}
@@ -88,7 +89,21 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .project-meta{font-size:13px;letter-spacing:.08em;text-transform:uppercase;opacity:.55;transition:opacity .2s}
 .project:hover .project-meta,.project:focus-visible .project-meta{opacity:1}
 .address{margin:0 0 1em;font-style:normal;font-size:1.15rem;line-height:1.85}
-.debug{position:fixed;z-index:30;left:1rem;bottom:1rem;margin:0;padding:.5rem .7rem;max-width:calc(100% - 2rem);background:rgba(0,0,0,.8);color:#fff;font:11px/1.5 monospace;white-space:pre-wrap;pointer-events:none}
+.debug{position:fixed;z-index:30;right:1rem;bottom:1rem;margin:0;padding:.5rem .7rem;max-width:calc(100% - 2rem);background:rgba(0,0,0,.8);color:#fff;font:11px/1.5 monospace;white-space:pre-wrap;pointer-events:none}
+/* Tuning panel for every particle effect */
+.tune-toggle{position:fixed;z-index:40;left:1rem;bottom:1rem;width:36px;height:36px;display:grid;place-items:center;gap:0;border:1px solid var(--rule);border-radius:4px;background:var(--paper);opacity:.55;transition:opacity .2s}
+.tune-toggle:hover,.tune-toggle[aria-expanded="true"]{opacity:1}
+.tune-toggle span{display:block;width:16px;height:1.5px;background:var(--ink);margin:1.75px 0}
+.tune{position:fixed;z-index:40;left:1rem;bottom:3.5rem;width:min(22rem,calc(100% - 2rem));max-height:min(70vh,36rem);display:flex;flex-direction:column;background:var(--paper);border:1px solid var(--rule);box-shadow:0 12px 32px rgba(0,0,0,.12);font-size:12px;letter-spacing:.02em}
+.tune[hidden]{display:none}
+.tune-head{display:flex;justify-content:space-between;align-items:baseline;gap:.75rem;padding:.75rem .9rem;border-bottom:1px solid var(--rule)}
+.tune-head span{display:flex;gap:.75rem}
+.tune-body{overflow:auto;padding:.4rem .9rem .6rem}
+.tune-group{margin:.6rem 0 .3rem;font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.55}
+.tune-row{display:grid;grid-template-columns:1fr auto;gap:.1rem .6rem;align-items:center;margin:.25rem 0}
+.tune-row output{font-variant-numeric:tabular-nums;opacity:.7}
+.tune-row input{grid-column:1/-1;width:100%;height:18px;margin:0;accent-color:var(--ink)}
+.tune-values{margin:0;border:0;border-top:1px solid var(--rule);padding:.5rem .9rem;background:transparent;color:inherit;font:10px/1.4 monospace;resize:none}
 .noscript{position:fixed;left:1.25rem;right:1.25rem;bottom:3rem;text-align:center;font-size:14px}
 
 @media(max-width:640px){.initials{font-size:clamp(5.5rem,42vw,9rem)}}
