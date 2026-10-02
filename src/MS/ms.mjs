@@ -8,11 +8,14 @@ const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
 const letters=[...initials.querySelectorAll('.initial')];
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
-const parameters={viscosity:.35,tension:.65,attraction:.5,strength:1.3,gravityX:0,gravityY:0,dripGravity:1400};
+// Impulse strength, attraction and viscosity at the maximum of the main page's sliders.
+const parameters={viscosity:1,tension:.65,attraction:1,strength:2.1,gravityX:0,gravityY:0,dripGravity:1400};
 const pointer={x:0,y:0,down:false,radius:80,id:null,last:0,startX:0,startY:0,dragged:false};
 const IDLE_DELAY=5000,IDLE_FORCE=1.6;
 // Letters condense from a cloud this wide (share of the shorter canvas side).
-const ASSEMBLE_SPREAD=.38;
+const ASSEMBLE_SPREAD=.3,ASSEMBLE_MS=1800;
+// While the cloud condenses the liquid flows thin; the honey-like
+// interaction parameters take over once the letters stand.
 // Holding a letter gathers the liquid, then it bursts; the spring lets go briefly.
 const HOLD_MS=480,BURST_SPEED=1100,BURST_FREE_MS=260;
 // Drops detach from the lowest edge every few quiet seconds and fall onto the line.
@@ -23,7 +26,7 @@ const MAGNET_STRENGTH=2.2,MAGNET_RADIUS=.26;
 const LINE_LOAD_GAIN=40,LINE_LOAD_MAX=600,LINE_IMPACT_GAIN=.05,LINE_KICK_MAX=400;
 let renderer=null,fluid=null,w=0,h=0,last=0,accumulator=0,layoutKey='',rebuildTimer=0;
 let idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null,homeLine=null,lineLoad=0,lineKick=0;
-let holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+DRIP_MIN,gap=null,magnetOn=false;
+let holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+DRIP_MIN,gap=null,magnetOn=false,settleUntil=0;
 const magnet={x:0,y:0,down:true,radius:0};
 const darkScheme=matchMedia('(prefers-color-scheme: dark)');
 const isHome=()=>home.classList.contains('is-active');
@@ -103,7 +106,7 @@ function scatter(){
   const a=Math.random()*Math.PI*2,d=r*Math.sqrt(Math.random());
   fluid.x[i]=clampX(fluid.tx[i]+Math.cos(a)*d);fluid.y[i]=clampY(fluid.ty[i]+Math.sin(a)*d);fluid.vx[i]=fluid.vy[i]=0;
  }
- idleSince=performance.now();
+ idleSince=performance.now();settleUntil=idleSince+ASSEMBLE_MS;
 }
 // Everything flies away from the press point; the spring lets go for a moment.
 function burst(x,y){
@@ -206,7 +209,7 @@ function frame(t){
   const box=home.getBoundingClientRect(),shape=homeLine?.shape();
   const line=shape&&{top:shape.top-box.top,width:shape.width,anchor:shape.anchor,offset:shape.offset,rate:shape.rate,shift:box.left};
   const brush=pointer.down?pointer:magnetOn&&!reducedMotion.matches?magnet:null;
-  const prm=brush===magnet?{...parameters,strength:MAGNET_STRENGTH}:parameters;
+  const prm=brush===magnet?{...parameters,strength:MAGNET_STRENGTH}:t<settleUntil?{...parameters,viscosity:.3,attraction:.5}:parameters;
   while(accumulator>=1/120){
    fluid.step(1/120,prm,brush);
    if(line){const hit=restrain(fluid,line);lineLoad=hit.load;lineKick+=Math.min(LINE_KICK_MAX,hit.impact*LINE_IMPACT_GAIN);}
