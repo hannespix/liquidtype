@@ -52,3 +52,11 @@ test('a released particle falls under drip gravity, neighbours stay, capture bri
  assert.ok(Math.abs(f.y[0]-200)<1,'returned');
  f.free[0]=1;f.reset();assert.equal(f.free[0],0);
 });
+test('homing pulls displaced liquid home sooner, default is unchanged',()=>{
+ const arrival=p=>{const f=new Fluid([{x:200,y:200}],800,500,6);f.x[0]+=120;for(let i=1;i<=600;i++){f.step(1/120,p);if(Math.abs(f.x[0]-200)<10)return i;}return 601;};
+ const plain=arrival(params),strong=arrival({...params,homing:2.5});
+ assert.ok(strong<plain*.75,`arrives sooner: ${strong} vs ${plain} steps`);
+ const a=new Fluid([{x:200,y:200}],800,500,6),b=new Fluid([{x:200,y:200}],800,500,6);a.x[0]+=50;b.x[0]+=50;
+ for(let i=0;i<30;i++){a.step(1/120,params);b.step(1/120,{...params,homing:1});}
+ assert.equal(a.x[0],b.x[0]);
+});

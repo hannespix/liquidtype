@@ -18,7 +18,7 @@ const defaults={
  idleDelay:5000,idleForce:1.6,
  // Letters condense from a cloud this wide (share of the shorter canvas
  // side); while condensing the liquid flows thin for assembleMs.
- assembleSpread:.3,assembleMs:1800,
+ assembleSpread:.2,assembleMs:2600,
  // Holding gathers the liquid, then it bursts; the spring lets go briefly.
  holdMs:480,burstSpeed:1100,burstFreeMs:260,
  // Drops detach from the lowest edge every few quiet seconds.
@@ -30,12 +30,15 @@ const defaults={
  // Phone sensors: px/s per m/s² for shaking and quick tilts, px/s² of
  // faint gravity toward a new lean.
  shakeGain:650,tiltGain:90,leanGain:120,
- // Flight between initials and headings, and its viscosity.
- morphMs:1000,morphViscosity:.85,
+ // Flight between initials and headings: duration, viscosity and how much
+ // harder the liquid is pulled to its target so it stands still at hand-over.
+ morphMs:1000,morphViscosity:.85,morphHoming:3,
  // Text grid: invisible strings every gridSpacing letter sizes that the
  // letters ride; their swing (stiffness, damping) and how hard scrolling
  // plucks them.
  gridSpacing:.2,gridStiffness:150,gridDamping:2.2,gridScroll:1.6,
+ // Drops in motion draw at this share of their resting size.
+ dropShrink:.55,
 };
 const tune={...defaults};
 const CALM_SPEED=25,LINE_LOAD_MAX=600,LINE_KICK_MAX=400;
@@ -153,7 +156,7 @@ function effects(t){
  else if(t>nextDrip){if(!reducedMotion.matches&&!pointer.down&&!burstUntil&&!intro.open&&calm())startDrip(t);else nextDrip=t+800;}
 }
 function scheduleRebuild(){clearTimeout(rebuildTimer);rebuildTimer=setTimeout(()=>rebuild(),120);}
-function draw(){if(renderer&&fluid)renderer.draw(fluid,dropSpacingNow(performance.now()));}
+function draw(){if(renderer&&fluid){renderer.dropShrink=tune.dropShrink;renderer.draw(fluid,dropSpacingNow(performance.now()));}}
 function local(e){const r=canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
 function disturb(x,y,dx,dy,radius){if(fluid&&Math.abs(dx)+Math.abs(dy)>=.1)fluid.impulse(x,y,dx,dy,radius);}
 
@@ -216,7 +219,7 @@ function frame(t){
  if(transition){
   // In flight between initials and heading: plain, thicker physics so the
   // liquid is calm when the real heading takes over; nothing else.
-  const flight={...parameters,viscosity:Math.max(parameters.viscosity,tune.morphViscosity)};
+  const flight={...parameters,viscosity:tune.morphViscosity,homing:tune.morphHoming};
   while(accumulator>=1/120){fluid.step(1/120,flight,null);accumulator-=1/120;}
   draw();return;
  }
@@ -226,7 +229,7 @@ function frame(t){
   const line=shape&&{top:shape.top-box.top,width:shape.width,anchor:shape.anchor,offset:shape.offset,rate:shape.rate,shift:box.left};
   magnet.radius=letterSize*tune.magnetRadius;
   const brush=pointer.down?pointer:magnetOn&&!reducedMotion.matches?magnet:null;
-  const prm=brush===magnet?{...parameters,strength:tune.magnetStrength}:t<settleUntil?{...parameters,viscosity:.3,attraction:.5}:parameters;
+  const prm=brush===magnet?{...parameters,strength:tune.magnetStrength}:t<settleUntil?{...parameters,viscosity:.3,attraction:.5,homing:2}:parameters;
   while(accumulator>=1/120){
    fluid.step(1/120,prm,brush);
    if(line){const hit=restrain(fluid,line);lineLoad=hit.load;lineKick+=Math.min(LINE_KICK_MAX,hit.impact*tune.lineImpactGain);}
@@ -375,10 +378,10 @@ function handOver(fromView,view,focus){
  return t;
 }
 function startTransition(t,ms){t.start=performance.now();t.ms=tune.morphMs;t.timers=[];transition=t;t.timers.push(setTimeout(()=>{if(transition===t)t.finish();},ms));}
-function dropSpacingNow(t){
+// In flight the finer of both densities is drawn from the first frame on.
+function dropSpacingNow(){
  if(!transition||!fluid)return fluid?.spacing;
- const k=Math.min(1,(t-transition.start)/transition.ms),e=k*k*(3-2*k);
- return transition.dropFrom+(transition.dropTo-transition.dropFrom)*e;
+ return Math.min(transition.dropFrom,transition.dropTo);
 }
 // Home to a section: the initials, in whatever state they are, dissolve
 // into the section's heading.
@@ -475,8 +478,9 @@ const TUNE=[
  ['Linie','lineLoadGain','Last',0,150,1],['Linie','lineImpactGain','Aufprall',0,.15,.005],
  ['Ruhebewegung','idleDelay','Verzögerung (ms)',1000,15000,100],['Ruhebewegung','idleForce','Kraft',0,4,.1],
  ['Sensoren','shakeGain','Schütteln',0,2000,10],['Sensoren','tiltGain','Kippen',0,300,1],['Sensoren','leanGain','Neigen (Schwerkraft)',0,500,5],
- ['Übergang','morphMs','Flugzeit (ms)',300,2500,50],['Übergang','morphViscosity','Zähigkeit im Flug',0,1,.01],
+ ['Übergang','morphMs','Flugzeit (ms)',300,2500,50],['Übergang','morphViscosity','Zähigkeit im Flug',0,1,.01],['Übergang','morphHoming','Zug zum Ziel',1,6,.1],
  ['Textgitter','gridSpacing','Abstand',.1,.4,.01],['Textgitter','gridStiffness','Schwingung',30,600,5],['Textgitter','gridDamping','Dämpfung',.3,6,.1],['Textgitter','gridScroll','Scrollen',0,4,.1],
+ ['Darstellung','dropShrink','Tropfen in Bewegung',.3,1,.01],
 ];
 const physicsDefaults={...parameters};
 const TUNE_KEY='ms-tune';
