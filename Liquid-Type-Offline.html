@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f8f8f4"><meta name="description" content="Schrift, die sich wie Flüssigkeit verhält. Verändere den Text, ziehe an der Oberfläche und experimentiere mit der Physik.">
+<title>Liquid Type — Schrift in Bewegung</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23f8f8f4'/%3E%3Cpath d='M20 5C18 12 8 20 8 27a12 12 0 0024 0C32 20 22 12 20 5' fill='%23090b0a'/%3E%3C/svg%3E">
+<style>
+:root{color-scheme:light;--paper:#f8f8f4;--ink:#111411;--muted:#757770;--line:#ddded5;--accent:#c3d63c;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:var(--paper);font-synthesis:none}*{box-sizing:border-box}body{margin:0}button,input{font:inherit}button,a,input{-webkit-tap-highlight-color:transparent}button{cursor:pointer}button:focus-visible,input:focus-visible,canvas:focus-visible,a:focus-visible{outline:2px solid #738122;outline-offset:5px}a{color:inherit;text-decoration:none}.topbar{height:100px;margin:0 4.5%;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);gap:24px}.brand{display:flex;gap:12px;align-items:center;font-size:20px;letter-spacing:-1px;font-weight:750}.brand svg{width:20px;height:26px}.brand-light{font-weight:400;margin-left:5px}.edition,.live,.stage-caption,.stage-footer,.section-label,.text-control label,.bottom>span:first-child{font-family:'Courier New',monospace;font-size:10px;letter-spacing:1.3px;line-height:1.5}.edition{color:var(--muted)}.live{display:flex;align-items:center;gap:9px;white-space:nowrap}.live i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#879b25;box-shadow:0 0 0 4px #879b2512}.live i.paused{background:#999;box-shadow:none}.experience{height:calc(100svh - 10px);min-height:620px}.sticky-stage{position:sticky;top:0;height:calc(100svh - 250px);min-height:430px;display:flex;flex-direction:column;padding:28px 4.5% 22px}.stage-caption,.stage-footer{display:flex;justify-content:space-between;align-items:center;color:var(--muted);gap:20px}.stage-caption{font-size:9px;letter-spacing:1.6px}.canvas-wrap{flex:1;position:relative;min-height:280px;margin:0 -2%;isolation:isolate}canvas{width:100%;height:100%;display:block;position:absolute;inset:0;touch-action:none;cursor:grab}canvas:active{cursor:grabbing}.axis{position:absolute;top:50%;font-family:monospace;color:#9c9f91;font-size:16px;pointer-events:none}.axis-left{left:0}.axis-right{right:0}.stage-footer{font-size:9px;letter-spacing:1px;color:#66695e}.tiny-arrow{font-size:18px;margin-right:10px}.scroll-cue{display:flex;align-items:center;gap:14px}.scroll-cue>span{font-size:21px}.cursor{position:absolute;left:0;top:0;width:88px;height:88px;border:1px solid #92978260;border-radius:50%;display:none;place-items:center;pointer-events:none;transform:translate(-50%,-50%);z-index:2;mix-blend-mode:multiply}.cursor span{font-family:monospace;letter-spacing:2px;font-size:9px;color:#6c725e}.cursor.dragging{background:#c3d63c19;border-color:#a9bc31}.cursor.dragging span{opacity:0}.controls{margin:-180px 4.5% 0;position:relative;z-index:3;display:grid;grid-template-columns:minmax(210px,.8fr) minmax(450px,2fr) 142px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--paper);padding:28px 0;gap:30px}.text-control{border-right:1px solid var(--line);padding-right:30px}.text-control label{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);letter-spacing:1px}.input-row{display:flex;align-items:center;border-bottom:1px solid #999e8b;margin-top:10px}.input-row input{font-family:Georgia,'Times New Roman',serif;font-size:29px;letter-spacing:-1px;background:none;border:0;outline:none;width:100%;padding:3px 0 9px;color:var(--ink);min-width:0}.input-row>span{font-size:22px;color:#868c79}.text-control p{font-size:11px;line-height:1.5;color:var(--muted);margin:11px 0 0}.section-label{display:flex;justify-content:space-between;font-size:9px;letter-spacing:1px;color:var(--muted);margin-bottom:23px;gap:16px}.section-label>span:last-child{font-size:8px;opacity:.75}.sliders{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:23px}.slider-label>span{font-size:11px;white-space:nowrap;display:flex;flex-wrap:wrap;gap:5px;justify-content:space-between}.slider-label output{font:10px 'Courier New',monospace;color:#6d7558}.slider-label small{display:flex;justify-content:space-between;font-size:9px;color:#8a8f7f}.slider-label input{display:block;width:100%;height:22px;margin:10px 0 5px;accent-color:#171b13;appearance:none;background:transparent;cursor:pointer}.slider-label input::-webkit-slider-runnable-track{height:2px;background:linear-gradient(to right,#444b32 var(--fill,50%),#d8dccd var(--fill,50%))}.slider-label input::-webkit-slider-thumb{appearance:none;width:10px;height:10px;margin-top:-4px;border-radius:50%;background:#20251a;box-shadow:0 0 0 4px var(--paper)}.slider-label input::-moz-range-track{height:2px;background:#d8dccd}.slider-label input::-moz-range-thumb{width:10px;height:10px;border:0;border-radius:50%;background:#20251a}.actions{border-left:1px solid var(--line);padding-left:24px;display:flex;flex-direction:column;justify-content:center;gap:8px}.actions button{border:1px solid var(--line);border-radius:4px;background:transparent;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 8px;font-size:11px;white-space:nowrap;color:var(--ink)}.actions button:first-child{background:var(--ink);border-color:var(--ink);color:var(--paper)}.actions button:hover{background:#e7e9df}.actions button:first-child:hover{background:#363b2e}.actions button>span:first-child{font-size:15px}.bottom{margin:0 4.5%;padding:27px 0 36px;display:flex;align-items:center;justify-content:space-between;gap:30px}.bottom>span:first-child{font-size:9px;color:var(--muted)}.bottom p{font-size:10px;color:#868b7c;line-height:1.7;text-align:center;margin:0}.footer-mark{font:italic 38px Georgia,serif;letter-spacing:-5px}.fallback{position:absolute;inset:0;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:20px}.fallback[hidden],.empty-note[hidden]{display:none}.fallback strong{font:clamp(35px,15vw,180px) Georgia,serif;max-width:100%;overflow-wrap:anywhere}.fallback p{font-size:13px;max-width:430px;line-height:1.6}.fallback button{border:1px solid var(--line);background:transparent;border-radius:3px;padding:10px 18px}.empty-note{position:absolute;inset:45% 20px auto;text-align:center;font:italic 24px Georgia,serif;color:#878d7b;pointer-events:none}
+@media(min-width:1600px){.topbar,.controls,.bottom{margin-left:7%;margin-right:7%}.sticky-stage{padding-left:7%;padding-right:7%}}
+@media(max-width:1100px){.controls{grid-template-columns:220px 1fr;gap:24px}.actions{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);padding:16px 0 0;flex-direction:row}.actions button{min-width:145px}.sliders{gap:18px}.section-label>span:last-child{display:none}.sticky-stage{height:calc(100svh - 280px)}.controls{margin-top:-180px}}
+@media(max-width:700px){.topbar{height:76px;margin:0 6%;gap:12px}.brand{font-size:18px}.brand svg{width:17px}.edition{display:none}.live{font-size:8px;letter-spacing:.8px}.experience{height:calc(72svh + 140px);min-height:550px}.sticky-stage{height:59svh;min-height:350px;padding:24px 6% 22px}.canvas-wrap{min-height:230px;margin:0 -2%}.stage-caption{font-size:7px;letter-spacing:1px}.stage-footer{font-size:7px;letter-spacing:.2px;gap:10px}.tiny-arrow{margin-right:3px;font-size:15px}.scroll-cue{gap:5px}.scroll-cue>span{font-size:17px}.controls{margin:-130px 6% 0;padding-top:22px;grid-template-columns:1fr;gap:23px}.text-control{border-right:0;padding:0}.input-row input{font-size:32px}.text-control p{font-size:10px}.section-label{margin-bottom:20px}.section-label>span:last-child{display:block;font-size:7px}.sliders{grid-template-columns:1fr 1fr;gap:25px 30px}.slider-label>span{font-size:11px}.slider-label input{height:26px;margin-top:9px}.actions{padding-top:20px}.actions button{flex:1}.bottom{margin:0 6%;align-items:flex-start;gap:18px;flex-wrap:wrap}.bottom>span:first-child{font-size:8px}.bottom p{order:3;width:100%;text-align:left;font-size:10px}.footer-mark{font-size:30px;line-height:20px}.cursor{display:none!important}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+@media(min-width:701px) and (max-width:1100px){.sliders{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 24px}}
+@media(max-width:700px){.actions button{min-width:0}}
+
+</style>
+</head>
+<body>
+<header class="topbar">
+ <a class="brand" href="#top" aria-label="Liquid Type Start"><svg viewBox="0 0 24 30" aria-hidden="true"><path d="M12 1C10 8 1 15 1 20a11 11 0 0022 0C23 15 14 8 12 1Z"/></svg><span>LIQUID<span class="brand-light">TYPE</span></span></a>
+ <span class="edition">INTERACTIVE TYPE EXPERIMENT / 001</span>
+ <span class="live"><i id="statusDot"></i><span id="status">LIVE PHYSICS</span></span>
+</header>
+<main id="top">
+ <section class="experience" aria-label="Interaktive Flüssigkeitsschrift">
+  <div class="sticky-stage">
+   <div class="stage-caption"><span>WORDS HAVE A NEW STATE.</span><span id="particleCount">INITIALISIERUNG</span></div>
+   <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="fluid" tabindex="0" role="img" aria-label="Flüssige Schrift LIQUID. Mit Maus oder Finger ziehen. Mit Pfeiltasten Wellen erzeugen."></canvas>
+    <div class="fallback" id="fallback" hidden><strong id="fallbackText">LIQUID</strong><p id="fallbackMessage"></p><button id="recover" type="button">Erneut versuchen</button></div>
+    <div class="cursor" id="cursor" aria-hidden="true"><span>DRAG</span></div>
+    <span class="axis axis-left" aria-hidden="true">+</span><span class="axis axis-right" aria-hidden="true">+</span>
+    <p class="empty-note" id="emptyNote" hidden>Deine nächste Idee beginnt mit einem Wort.</p>
+   </div>
+   <div class="stage-footer"><span><span class="tiny-arrow">↗</span> ZIEHEN. LOSLASSEN. NACHSPÜREN.</span><span class="scroll-cue">SCROLL FÜR EINE WELLE <span>↓</span></span></div>
+  </div>
+ </section>
+ <section class="controls" aria-label="Text und Flüssigkeit einstellen">
+  <div class="text-control">
+   <label for="textInput"><span>01 / DEIN TEXT</span><span id="charCount">6 / 32</span></label>
+   <div class="input-row"><input id="textInput" maxlength="32" value="LIQUID" autocomplete="off" spellcheck="false" aria-describedby="textHelp"><span aria-hidden="true">↵</span></div>
+   <p id="textHelp">Jedes Wort nimmt seine eigene Form an.</p>
+  </div>
+  <div class="physics-controls">
+   <div class="section-label"><span>02 / DAS GEFÜHL</span><span>FLÜSSIGKEIT IN DEINER HAND</span></div>
+   <div class="sliders">
+    <label class="slider-label" for="viscosity"><span>Zähflüssigkeit <output id="viscosityValue">35%</output></span><input type="range" id="viscosity" min="0" max="100" value="35"><small>Wasser <span>Honig</span></small></label>
+    <label class="slider-label" for="tension"><span>Oberflächenspannung <output id="tensionValue">65%</output></span><input type="range" id="tension" min="0" max="100" value="65"><small>Weich <span>Kompakt</span></small></label>
+    <label class="slider-label" for="attraction"><span>Anziehung <output id="attractionValue">50%</output></span><input type="range" id="attraction" min="0" max="100" value="50"><small>Lose <span>Verbunden</span></small></label>
+    <label class="slider-label" for="strength"><span>Impulsstärke <output id="strengthValue">60%</output></span><input type="range" id="strength" min="0" max="100" value="60"><small>Sanft <span>Wild</span></small></label>
+   </div>
+  </div>
+  <div class="actions"><button id="pause" type="button" aria-pressed="false"><span id="pauseIcon" aria-hidden="true">Ⅱ</span><span id="pauseLabel">Pause</span></button><button id="reset" type="button"><span aria-hidden="true">↺</span> Zurücksetzen</button></div>
+ </section>
+ <footer class="bottom"><span>TYPE IS NO LONGER STILL.</span><p>Eine spielerische 2D-Flüssigkeitssimulation.<br>Mit Kohäsion, Trägheit und einem Gedächtnis für Buchstaben.</p><span class="footer-mark" aria-hidden="true">lt.</span></footer>
+</main>
+<noscript>Bitte aktiviere JavaScript, um die interaktive Schrift auszuprobieren.</noscript>
+<script>
+(()=>{
+"use strict";
+// Pixel-space, fixed-step fluid approximation: local pressure, cohesion and viscosity.
+// The target spring is intentionally artistic: it lets liquid remember its glyph.
+class Fluid {
+ constructor(points,width,height,spacing=6){
+  this.width=width;this.height=height;this.spacing=spacing;this.n=points.length;this.time=0;
+  for(const k of ['x','y','vx','vy','tx','ty','ax','ay'])this[k]=new Float32Array(this.n);
+  points.forEach((p,i)=>{this.x[i]=this.tx[i]=p.x;this.y[i]=this.ty[i]=p.y;});
+  this.h=spacing*2.4;this.cols=Math.ceil(width/this.h)+1;this.rows=Math.ceil(height/this.h)+1;
+  this.head=new Int32Array(this.cols*this.rows);this.next=new Int32Array(this.n);
+ }
+ reset(){this.x.set(this.tx);this.y.set(this.ty);this.vx.fill(0);this.vy.fill(0);this.time=0;}
+ impulse(x,y,dx,dy,radius){
+  dx=Math.max(-650,Math.min(650,dx));dy=Math.max(-650,Math.min(650,dy));
+  for(let i=0;i<this.n;i++){const d=Math.hypot(this.x[i]-x,this.y[i]-y);if(d<radius){const w=(1-d/radius)**2;this.vx[i]=Math.max(-1500,Math.min(1500,this.vx[i]+dx*w));this.vy[i]=Math.max(-1500,Math.min(1500,this.vy[i]+dy*w));}}
+ }
+ step(dt,p,pointer=null){
+  dt=Math.max(0,Math.min(1/60,dt));if(!dt)return;this.time+=dt;
+  const {n,x,y,vx,vy,ax,ay,tx,ty,h,cols,rows,head,next,spacing:s}=this;
+  head.fill(-1);
+  const brush=pointer?.down?pointer:null;
+  for(let i=0;i<n;i++){
+   const c=Math.max(0,Math.min(cols-1,Math.floor(x[i]/h))),r=Math.max(0,Math.min(rows-1,Math.floor(y[i]/h)));const k=c+r*cols;next[i]=head[k];head[k]=i;
+   const b=brush?Math.max(0,1-Math.hypot(x[i]-brush.x,y[i]-brush.y)/brush.radius):0;
+   const homeDistance=Math.hypot(tx[i]-x[i],ty[i]-y[i]);
+   const spring=(22+230*Math.exp(-homeDistance*homeDistance/(s*s*12)))*(1-.98*b);ax[i]=(tx[i]-x[i])*spring;ay[i]=(ty[i]-y[i])*spring;
+   if(brush){ax[i]+=(brush.x-x[i])*b*22*p.strength;ay[i]+=(brush.y-y[i])*b*22*p.strength;}
+  }
+  for(let i=0;i<n;i++){
+   const c=Math.floor(x[i]/h),r=Math.floor(y[i]/h);
+   for(let ry=Math.max(0,r-1);ry<=Math.min(rows-1,r+1);ry++)for(let cx=Math.max(0,c-1);cx<=Math.min(cols-1,c+1);cx++){
+    for(let j=head[cx+ry*cols];j!==-1;j=next[j]){
+     if(j<=i)continue;
+     let dx=x[j]-x[i],dy=y[j]-y[i],d2=dx*dx+dy*dy;if(d2>=h*h)continue;
+     if(d2<.0001){dx=(i%2?1:-1)*.01;dy=.007;d2=dx*dx+dy*dy;}
+     const d=Math.sqrt(d2),q=1-d/h,nx=dx/d,ny=dy/d;
+     const pressure=d<s*.93?-650*(s*.93-d):0;
+     const cohesion=(28+85*p.tension+70*p.attraction)*q;
+     const f=pressure+cohesion;
+     const visc=(.25+3*p.viscosity)*q;
+     const rx=tx[j]-tx[i],ry=ty[j]-ty[i],rd=Math.hypot(rx,ry);
+     let restX=0,restY=0;
+     if(rd>.0001&&rd<h){
+      const restForce=(rd<s*.93?-650*(s*.93-rd):0)+(28+85*p.tension+70*p.attraction)*(1-rd/h);
+      restX=rx/rd*restForce;restY=ry/rd*restForce;
+     }
+     const fx=nx*f-restX+(vx[j]-vx[i])*visc,fy=ny*f-restY+(vy[j]-vy[i])*visc;
+     ax[i]+=fx;ay[i]+=fy;ax[j]-=fx;ay[j]-=fy;
+    }
+   }
+  }
+  const damping=Math.exp(-(1.05+p.viscosity*3.4)*dt);
+  for(let i=0;i<n;i++){
+   vx[i]=Math.max(-1600,Math.min(1600,(vx[i]+ax[i]*dt)*damping));vy[i]=Math.max(-1600,Math.min(1600,(vy[i]+ay[i]*dt)*damping));
+   x[i]+=vx[i]*dt;y[i]+=vy[i]*dt;
+   if(x[i]<s){x[i]=s;vx[i]=Math.abs(vx[i])*.3;}else if(x[i]>this.width-s){x[i]=this.width-s;vx[i]=-Math.abs(vx[i])*.3;}
+   if(y[i]<s){y[i]=s;vy[i]=Math.abs(vy[i])*.3;}else if(y[i]>this.height-s){y[i]=this.height-s;vy[i]=-Math.abs(vy[i])*.3;}
+  }
+ }
+}
+
+
+const vertex=`#version 300 es
+precision highp float;
+in vec2 position;
+in vec2 home;
+in float deformation;
+uniform vec2 resolution;
+uniform float diameter;
+out vec2 materialHome;
+out vec2 currentPosition;
+out float strain;
+void main(){materialHome=home;currentPosition=position;strain=deformation;gl_Position=vec4(position/resolution*vec2(2.,-2.)+vec2(-1.,1.),0.,1.);gl_PointSize=diameter;}`;
+const drop=`#version 300 es
+precision highp float;
+uniform sampler2D glyphMaterial;
+uniform vec2 resolution;
+uniform float radius;
+in vec2 materialHome;
+in vec2 currentPosition;
+uniform vec2 pixelScale;
+in float strain;
+out vec4 color;
+void main(){
+ vec2 pixel=vec2(gl_FragCoord.x/pixelScale.x,resolution.y-gl_FragCoord.y/pixelScale.y);
+ vec2 offset=pixel-currentPosition;vec2 q=offset/radius;float d=dot(q,q);if(d>1.)discard;
+ // Smooth, overlapping material kernels: there are no rectangular cells or
+ // hard support edges. Normalize their coverage in the surface reconstruction.
+ float ink=texture(glyphMaterial,(materialHome+offset)/resolution).a;
+ float shape=smoothstep(.02,.9,strain);
+ float kernel=.16*pow(max(0.,1.-d),3.);
+ color=vec4(kernel*mix(ink,1.,shape),kernel,kernel*shape,0.);
+
+}`;
+const screen=`#version 300 es
+precision highp float;
+out vec2 uv;
+void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));uv=p;gl_Position=vec4(p*2.-1.,0.,1.);}`;
+const surface=`#version 300 es
+precision highp float;
+in vec2 uv;
+uniform sampler2D density;
+uniform vec2 texel;
+out vec4 color;
+void main(){
+ vec3 sums=texture(density,uv).rgb;
+ float coverage=sums.g;
+ float agitation=clamp(sums.b/max(coverage,.0001),0.,1.);
+ // At equilibrium the material samples agree exactly. During deformation the
+ // same field becomes a free fluid-density surface; there is no second image.
+ float v=.9*sums.r/max(mix(coverage,.16,agitation),.0001);
+ v*=smoothstep(.006,.024,coverage);
+ float aa=max(fwidth(v)*.65,.012);
+ float body=smoothstep(.51-aa,.51+aa,v);
+ color=vec4(mix(vec3(.973,.973,.957),vec3(.016,.020,.019),body),1.);
+
+}`;
+class FluidRenderer {
+ constructor(canvas){
+  const gl=canvas.getContext('webgl2',{alpha:false,antialias:false,powerPreference:'high-performance',depth:false,stencil:false});
+  if(!gl)throw new Error('WebGL2 ist auf diesem Gerät nicht verfügbar.');
+  this.gl=gl;this.canvas=canvas;this.floatSurface=!!gl.getExtension('EXT_color_buffer_float');
+  this.points=this.program(vertex,drop);this.surface=this.program(screen,surface);
+  this.buffer=gl.createBuffer();this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
+  for(const [name,size,offset] of [['position',2,0],['home',2,8],['deformation',1,16]]){const loc=gl.getAttribLocation(this.points,name);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,size,gl.FLOAT,false,20,offset);}
+  this.glyph=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4));
+  this.texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  this.fbo=gl.createFramebuffer();this.data=new Float32Array(0);
+  this.maxPointSize=gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1];
+ }
+ program(vs,fs){
+  const gl=this.gl;const p=gl.createProgram();
+  for(const [type,source] of [[gl.VERTEX_SHADER,vs],[gl.FRAGMENT_SHADER,fs]]){const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));gl.attachShader(p,s);gl.deleteShader(s);}
+  gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));return p;
+ }
+ setMaterial(source){
+  const gl=this.gl;gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);gl.activeTexture(gl.TEXTURE0);
+ }
+ resize(w,h){
+  const gl=this.gl;this.w=w;this.h=h;this.scale=Math.min(devicePixelRatio||1,2,2400/w);this.canvas.width=Math.round(w*this.scale);this.canvas.height=Math.round(h*this.scale);
+  gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texImage2D(gl.TEXTURE_2D,0,this.floatSurface?gl.RGBA16F:gl.RGBA8,this.canvas.width,this.canvas.height,0,gl.RGBA,this.floatSurface?gl.HALF_FLOAT:gl.UNSIGNED_BYTE,null);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbo);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,this.texture,0);
+  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('Die Grafikoberfläche konnte nicht angelegt werden.');
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+ }
+ draw(fluid){
+  const gl=this.gl;if(gl.isContextLost())return;
+  if(this.data.length!==fluid.n*5)this.data=new Float32Array(fluid.n*5);
+  for(let i=0;i<fluid.n;i++){
+   const k=i*5;this.data[k]=fluid.x[i];this.data[k+1]=fluid.y[i];this.data[k+2]=fluid.tx[i];this.data[k+3]=fluid.ty[i];
+   this.data[k+4]=Math.hypot(fluid.x[i]-fluid.tx[i],fluid.y[i]-fluid.ty[i])/fluid.spacing+Math.hypot(fluid.vx[i],fluid.vy[i])/(fluid.spacing*12);
+  }
+  gl.viewport(0,0,this.canvas.width,this.canvas.height);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbo);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.useProgram(this.points);gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,this.data,gl.DYNAMIC_DRAW);
+  gl.uniform2f(gl.getUniformLocation(this.points,'resolution'),this.w,this.h);gl.uniform1f(gl.getUniformLocation(this.points,'diameter'),Math.min(this.maxPointSize,fluid.spacing*4.2*this.scale));
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.uniform1i(gl.getUniformLocation(this.points,'glyphMaterial'),1);gl.uniform2f(gl.getUniformLocation(this.points,'pixelScale'),this.canvas.width/this.w,this.canvas.height/this.h);gl.uniform1f(gl.getUniformLocation(this.points,'radius'),fluid.spacing*2.1);
+  gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE);gl.drawArrays(gl.POINTS,0,fluid.n);gl.disable(gl.BLEND);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.useProgram(this.surface);gl.bindVertexArray(null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.texture);
+  gl.uniform1i(gl.getUniformLocation(this.surface,'density'),0);gl.uniform2f(gl.getUniformLocation(this.surface,'texel'),1/this.canvas.width,1/this.canvas.height);gl.drawArrays(gl.TRIANGLES,0,3);
+ }
+}
+
+
+const $=id=>document.getElementById(id);
+const canvas=$('fluid'),wrap=$('canvasWrap'),input=$('textInput'),cursor=$('cursor');
+// No alternate text layer: the only visible typography is the particle surface.
+function disturb(x,y,dx,dy,radius){
+ if(Math.abs(dx)+Math.abs(dy)<.1)return;
+ fluid.impulse(x,y,dx,dy,radius);
+}
+const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+const controls=['viscosity','tension','attraction','strength'];
+const parameters={viscosity:.35,tension:.65,attraction:.5,strength:1.3};
+let renderer=null,fluid=null,paused=reduced.matches,failed=false,w=0,h=0,last=0,accumulator=0,textTimer,resizeTimer;
+const pointer={x:-1000,y:-1000,down:false,radius:95,id:null,last:0};
+function updateStatus(){
+ $('pause').setAttribute('aria-pressed',String(paused));$('pauseLabel').textContent=paused?'Fortsetzen':'Pause';$('pauseIcon').textContent=paused?'▶':'Ⅱ';
+ $('status').textContent=failed?'GRAFIK PAUSIERT':paused?'PHYSICS PAUSED':'LIVE PHYSICS';$('statusDot').classList.toggle('paused',paused||failed);
+}
+function setPaused(value){paused=value;accumulator=0;last=0;pointer.down=false;cursor.classList.remove('dragging');updateStatus();}
+function setParameter(name,value){
+ const v=Math.min(100,Math.max(0,Number(value)));$(name).value=String(v);$(name+'Value').value=v+'%';$(name).style.setProperty('--fill',v+'%');parameters[name]=name==='strength'?.1+v/50:v/100;
+}
+controls.forEach(name=>{$(name).addEventListener('input',e=>setParameter(name,e.target.value));setParameter(name,$(name).value);});
+function maskPoints(text,width,height){
+ if(!text.trim()){const blank=document.createElement('canvas');blank.width=blank.height=1;renderer?.setMaterial(blank);return{points:[],spacing:5};}
+ const c=document.createElement('canvas');c.width=Math.ceil(width);c.height=Math.ceil(height);const ctx=c.getContext('2d',{willReadFrequently:true});
+ let size=Math.min(height*.63,width*.7,330);ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
+ const measured=ctx.measureText(text).width;size*=Math.min(1,width*.86/Math.max(1,measured));ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
+ const m=ctx.measureText(text);ctx.textAlign='center';ctx.fillStyle='black';ctx.fillText(text,width/2,height/2+(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2);
+ // High-resolution glyph coverage is material data for the particles, never a
+ // screen-space text image, SVG overlay, opacity layer or alternative renderer.
+ const material=document.createElement('canvas');const scale=Math.min(devicePixelRatio||1,2);material.width=Math.ceil(width*scale);material.height=Math.ceil(height*scale);
+ const mc=material.getContext('2d');mc.scale(material.width/width,material.height/height);mc.font=ctx.font;mc.textAlign='center';mc.fillStyle='black';mc.fillText(text,width/2,height/2+(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2);renderer?.setMaterial(material);
+ const rgba=ctx.getImageData(0,0,c.width,c.height).data;
+ let area=0;for(let i=3;i<rgba.length;i+=4)area+=rgba[i]/255;
+ const budget=width<700?2200:4200;let spacing=Math.max(2.5,Math.sqrt(area/(budget*.8)));
+ let points=[];
+ // Keep a complete lattice cell for every ink intersection, including fine serifs.
+ for(let attempt=0;attempt<3;attempt++){
+  points=[];
+  for(let y=0;y<height;y+=spacing)for(let x=0;x<width;x+=spacing){
+   let ink=false;
+   for(let yy=Math.floor(y);yy<Math.min(height,y+spacing)&&!ink;yy++)for(let xx=Math.floor(x);xx<Math.min(width,x+spacing);xx++){
+    if(rgba[(yy*c.width+xx)*4+3]>0){ink=true;break;}
+   }
+   if(ink)points.push({x:x+spacing*.5,y:y+spacing*.5});
+  }
+  if(points.length<=budget)break;spacing*=Math.sqrt(points.length/budget)*1.03;
+ }
+ return {points,spacing};
+}
+function setText(value,animate=true){
+ input.value=Array.from(value).slice(0,32).join('');const text=input.value;
+ $('charCount').textContent=Array.from(text).length+' / 32';$('fallbackText').textContent=text;
+ $('emptyNote').hidden=!!text.trim();canvas.setAttribute('aria-label',`Flüssige Schrift ${text||'– leer'}. Mit Maus oder Finger ziehen. Mit Pfeiltasten Wellen erzeugen.`);
+ if(!w||!h)return;
+ const old=fluid;const {points,spacing}=maskPoints(text,w,h);fluid=new Fluid(points,w,h,spacing);
+ // Keep a short, bounded morph when typing. Particle count may change independently.
+ if(animate&&old?.n&&!paused){
+  for(let i=0;i<fluid.n;i++){
+   const j=Math.min(old.n-1,Math.floor(i*old.n/fluid.n));
+   fluid.x[i]=fluid.tx[i]+Math.max(-80,Math.min(80,old.x[j]-fluid.tx[i]))*.55;
+   fluid.y[i]=fluid.ty[i]+Math.max(-60,Math.min(60,old.y[j]-fluid.ty[i]))*.55;
+   fluid.vy[i]=Math.sin(i*.19)*30;
+  }
+ }
+ $('particleCount').textContent=fluid.n.toLocaleString('de-DE')+' PARTICLES';
+ draw();
+}
+function draw(){if(renderer&&fluid&&!failed)renderer.draw(fluid);}
+function showFailure(message){failed=true;canvas.style.visibility='hidden';$('fallback').hidden=false;$('fallbackMessage').textContent=message;cursor.style.display='none';updateStatus();}
+function setup(){
+ try{
+  renderer=new FluidRenderer(canvas);failed=false;canvas.style.visibility='visible';$('fallback').hidden=true;
+  resize();updateStatus();
+ }catch(error){console.warn('Liquid Type graphics:',error);showFailure('Die interaktive Grafik ist gerade nicht verfügbar. Bitte versuche es mit aktivierter Hardwarebeschleunigung in einem aktuellen Browser.');}
+}
+function resize(){
+ const rect=wrap.getBoundingClientRect();const nw=Math.max(100,Math.round(rect.width)),nh=Math.max(160,Math.round(rect.height));
+ if(nw===w&&nh===h&&fluid&&renderer?.w===w)return;w=nw;h=nh;pointer.radius=Math.max(60,Math.min(110,w*.13));
+ if(renderer&&!failed)renderer.resize(w,h);setText(input.value,false);
+}
+input.addEventListener('input',()=>{clearTimeout(textTimer);$('charCount').textContent=Array.from(input.value).length+' / 32';textTimer=setTimeout(()=>setText(input.value),130);});
+input.addEventListener('keydown',e=>{if(e.key==='Enter'){clearTimeout(textTimer);setText(input.value);input.blur();}});
+$('pause').addEventListener('click',()=>setPaused(!paused));
+$('reset').addEventListener('click',()=>{fluid?.reset();pointer.down=false;draw();});
+$('recover').addEventListener('click',()=>location.reload());
+canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();showFailure('Die Grafikverbindung wurde unterbrochen. Sie wird automatisch wiederhergestellt, sobald dein Browser bereit ist.');});
+canvas.addEventListener('webglcontextrestored',()=>{w=0;h=0;setup();});
+function move(e){
+ const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;const now=performance.now();
+ if(fluid&&!paused&&!failed&&pointer.last){
+  const dx=x-pointer.x,dy=y-pointer.y;
+  if(pointer.down)disturb(x,y,dx*16*parameters.strength,dy*16*parameters.strength,pointer.radius);
+  else if(e.pointerType==='mouse'&&Math.hypot(dx,dy)<100)disturb(x,y,dx*2.5*parameters.strength,dy*2.5*parameters.strength,pointer.radius*.65);
+ }
+ pointer.x=x;pointer.y=y;pointer.last=now;cursor.style.left=x+'px';cursor.style.top=y+'px';
+ if(e.pointerType==='mouse'&&!failed)cursor.style.display='grid';
+}
+canvas.addEventListener('pointerdown',e=>{if(pointer.id!==null||failed)return;move(e);pointer.id=e.pointerId;pointer.down=!paused;canvas.setPointerCapture(e.pointerId);cursor.classList.toggle('dragging',pointer.down);});
+canvas.addEventListener('pointermove',e=>{if(pointer.id!==null&&e.pointerId!==pointer.id)return;move(e);});
+function release(e){if(pointer.id!==null&&e.pointerId!==pointer.id)return;pointer.down=false;pointer.id=null;cursor.classList.remove('dragging');}
+canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('lostpointercapture',release);
+canvas.addEventListener('pointerleave',()=>{cursor.style.display='none';if(!pointer.down)pointer.last=0;});
+canvas.addEventListener('keydown',e=>{
+ if(e.key===' '){e.preventDefault();setPaused(!paused);return;}
+ if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
+  e.preventDefault();if(fluid&&!paused){const dx=e.key==='ArrowLeft'?-420:e.key==='ArrowRight'?420:0,dy=e.key==='ArrowUp'?-420:e.key==='ArrowDown'?420:0;fluid.impulse(w/2,h/2,dx,dy,Math.max(w,h));}
+ }
+});
+let previousScroll=scrollY;
+window.addEventListener('scroll',()=>{
+ const delta=Math.max(-100,Math.min(100,scrollY-previousScroll));previousScroll=scrollY;
+ if(!fluid||paused||failed)return;
+ const rect=canvas.getBoundingClientRect();if(rect.bottom<0||rect.top>innerHeight)return;
+ for(let i=0;i<fluid.n;i++){
+  fluid.vy[i]=Math.max(-1100,Math.min(1100,fluid.vy[i]-delta*3.2*parameters.strength*(.65+.35*Math.sin(fluid.tx[i]/w*Math.PI))));
+  fluid.vx[i]+=Math.sin(fluid.tx[i]*.022)*delta*.18;
+ }
+},{passive:true});
+new ResizeObserver(()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{try{resize();}catch{showFailure('Die Grafik konnte nicht angepasst werden. Bitte lade die Ansicht neu.');}},100);}).observe(wrap);
+document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;pointer.down=false;pointer.id=null;cursor.classList.remove('dragging');});
+reduced.addEventListener('change',e=>{if(e.matches)setPaused(true);});
+function frame(t){
+ requestAnimationFrame(frame);
+ if(document.hidden){last=0;return;}
+ const dt=last?Math.min(.04,(t-last)/1000):0;last=t;
+ if(paused||failed||!fluid)return;
+ accumulator=Math.min(.04,accumulator+dt);
+ while(accumulator>=1/120){
+  const tick=1/120;
+  fluid.step(tick,parameters,pointer);accumulator-=tick;
+ }
+ draw();
+}
+setup();updateStatus();requestAnimationFrame(frame);
+// Expose the same visible controls to compatible browsers; no network or storage.
+if(document.modelContext?.registerTool){
+ const lifecycle=new AbortController();
+ try{Promise.resolve(document.modelContext.registerTool({
+  name:'configure_liquid_type',title:'Flüssigkeitsschrift einstellen',description:'Ändert den sichtbaren Text, die Physikregler oder den Pausenstatus der lokalen Animation.',
+  inputSchema:{type:'object',properties:{text:{type:'string',maxLength:32},viscosity:{type:'number',minimum:0,maximum:100},tension:{type:'number',minimum:0,maximum:100},attraction:{type:'number',minimum:0,maximum:100},strength:{type:'number',minimum:0,maximum:100},paused:{type:'boolean'}},additionalProperties:false},
+  annotations:{readOnlyHint:false,untrustedContentHint:false},
+  execute(value){
+   if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('Ein Einstellungsobjekt wird benötigt.');
+   for(const key of Object.keys(value))if(![...controls,'text','paused'].includes(key))throw new Error('Unbekannte Einstellung.');
+   if(value.text!==undefined&&(typeof value.text!=='string'||Array.from(value.text).length>32))throw new Error('Text darf höchstens 32 Zeichen enthalten.');
+   for(const key of controls)if(value[key]!==undefined&&(typeof value[key]!=='number'||!Number.isFinite(value[key])||value[key]<0||value[key]>100))throw new Error('Regler müssen zwischen 0 und 100 liegen.');
+   if(value.paused!==undefined&&typeof value.paused!=='boolean')throw new Error('paused muss ein Wahrheitswert sein.');
+   if(value.text!==undefined){clearTimeout(textTimer);setText(value.text);}
+   for(const key of controls)if(value[key]!==undefined)setParameter(key,value[key]);
+   if(value.paused!==undefined)setPaused(value.paused);
+   return{text:input.value,paused,particles:fluid?.n??0,...Object.fromEntries(controls.map(k=>[k,Number($(k).value)]))};
+  }
+ },{signal:lifecycle.signal})).catch(()=>{});}catch{/* Optional browser API; the visible controls remain available. */}
+ window.addEventListener('pagehide',()=>lifecycle.abort(),{once:true});
+}
+
+})();
+</script>
+</body>
+</html>
