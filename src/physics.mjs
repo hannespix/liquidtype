@@ -23,17 +23,18 @@ export class Fluid {
  }
  // Optional p.gravityX / p.gravityY (px/s²) apply a uniform external force,
  // for example from a phone's tilt and shake. Zero or missing means none.
+ // Optional p.homing scales the spring toward the glyph (1 = as designed).
  step(dt,p,pointer=null){
   dt=Math.max(0,Math.min(1/60,dt));if(!dt)return;this.time+=dt;
   const {n,x,y,vx,vy,ax,ay,tx,ty,free,h,cols,rows,head,next,spacing:s}=this;
-  const gx=p.gravityX||0,gy=p.gravityY||0,drip=p.dripGravity||0;
+  const gx=p.gravityX||0,gy=p.gravityY||0,drip=p.dripGravity||0,homing=p.homing||1;
   head.fill(-1);
   const brush=pointer?.down?pointer:null;
   for(let i=0;i<n;i++){
    const c=Math.max(0,Math.min(cols-1,Math.floor(x[i]/h))),r=Math.max(0,Math.min(rows-1,Math.floor(y[i]/h)));const k=c+r*cols;next[i]=head[k];head[k]=i;
    const b=brush?Math.max(0,1-Math.hypot(x[i]-brush.x,y[i]-brush.y)/brush.radius):0;
    const homeDistance=Math.hypot(tx[i]-x[i],ty[i]-y[i]);
-   const spring=(22+230*Math.exp(-homeDistance*homeDistance/(s*s*12)))*(1-.98*b)*(1-free[i]);ax[i]=(tx[i]-x[i])*spring;ay[i]=(ty[i]-y[i])*spring+drip*free[i];
+   const spring=(22+230*Math.exp(-homeDistance*homeDistance/(s*s*12)))*homing*(1-.98*b)*(1-free[i]);ax[i]=(tx[i]-x[i])*spring;ay[i]=(ty[i]-y[i])*spring+drip*free[i];
    if(brush){ax[i]+=(brush.x-x[i])*b*22*p.strength;ay[i]+=(brush.y-y[i])*b*22*p.strength;}
   }
   for(let i=0;i<n;i++){
