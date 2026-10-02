@@ -18,18 +18,19 @@ export function sagWeight(width,anchor,x){const t=curveParameter(width,anchor,x)
 // top (rest height), width, anchor (0..1), offset (px, positive = down),
 // rate (offset change in px/s) and shift (added to fluid x to get line x).
 // Particles that are pushed carry the line's velocity. Returns how many
-// particles press on the line, which the caller feeds back as load.
+// particles press on the line (load) and the summed speed with which
+// particles hit it this step (impact, px/s), both for the caller to feed back.
 export function restrain(fluid,line){
  const {x,y,vy,n}=fluid,{top,width,anchor,offset,rate,shift=0}=line;
  const lowest=top+Math.min(0,offset);
- let load=0;
+ let load=0,impact=0;
  for(let i=0;i<n;i++){
   if(y[i]<lowest)continue;
   const k=sagWeight(width,anchor,x[i]+shift),ly=top+k*offset;
   if(y[i]<ly)continue;
   const lv=k*rate;
   load++;y[i]=ly;
-  if(vy[i]>lv)vy[i]=lv-(vy[i]-lv)*.2;
+  if(vy[i]>lv){impact+=(vy[i]-lv)*k;vy[i]=lv-(vy[i]-lv)*.2;}
  }
- return load;
+ return {load,impact};
 }

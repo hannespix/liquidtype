@@ -70,6 +70,7 @@ export class FluidRenderer {
   this.fbo=gl.createFramebuffer();this.data=new Float32Array(0);
   this.maxPointSize=gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1];
  }
+ setColors(paper,ink){this.paper=paper;this.ink=ink;}
  program(vs,fs){
   const gl=this.gl;const p=gl.createProgram();
   for(const [type,source] of [[gl.VERTEX_SHADER,vs],[gl.FRAGMENT_SHADER,fs]]){const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));gl.attachShader(p,s);gl.deleteShader(s);}

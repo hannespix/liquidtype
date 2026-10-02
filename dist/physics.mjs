@@ -3,12 +3,14 @@
 export class Fluid {
  constructor(points,width,height,spacing=6){
   this.width=width;this.height=height;this.spacing=spacing;this.n=points.length;this.time=0;
-  for(const k of ['x','y','vx','vy','tx','ty','ax','ay'])this[k]=new Float32Array(this.n);
+  // free[i] in 0..1 releases a particle from its glyph spring; released
+  // particles feel p.dripGravity instead, so drops can fall and be recaptured.
+  for(const k of ['x','y','vx','vy','tx','ty','ax','ay','free'])this[k]=new Float32Array(this.n);
   points.forEach((p,i)=>{this.x[i]=this.tx[i]=p.x;this.y[i]=this.ty[i]=p.y;});
   this.h=spacing*2.4;this.cols=Math.ceil(width/this.h)+1;this.rows=Math.ceil(height/this.h)+1;
   this.head=new Int32Array(this.cols*this.rows);this.next=new Int32Array(this.n);
  }
- reset(){this.x.set(this.tx);this.y.set(this.ty);this.vx.fill(0);this.vy.fill(0);this.time=0;}
+ reset(){this.x.set(this.tx);this.y.set(this.ty);this.vx.fill(0);this.vy.fill(0);this.free.fill(0);this.time=0;}
  // Uniform velocity change for the whole liquid, slightly varied over the
  // glyph so a shake sloshes instead of shifting the letters as one block.
  nudge(dx,dy){
@@ -23,15 +25,15 @@ export class Fluid {
  // for example from a phone's tilt and shake. Zero or missing means none.
  step(dt,p,pointer=null){
   dt=Math.max(0,Math.min(1/60,dt));if(!dt)return;this.time+=dt;
-  const {n,x,y,vx,vy,ax,ay,tx,ty,h,cols,rows,head,next,spacing:s}=this;
-  const gx=p.gravityX||0,gy=p.gravityY||0;
+  const {n,x,y,vx,vy,ax,ay,tx,ty,free,h,cols,rows,head,next,spacing:s}=this;
+  const gx=p.gravityX||0,gy=p.gravityY||0,drip=p.dripGravity||0;
   head.fill(-1);
   const brush=pointer?.down?pointer:null;
   for(let i=0;i<n;i++){
    const c=Math.max(0,Math.min(cols-1,Math.floor(x[i]/h))),r=Math.max(0,Math.min(rows-1,Math.floor(y[i]/h)));const k=c+r*cols;next[i]=head[k];head[k]=i;
    const b=brush?Math.max(0,1-Math.hypot(x[i]-brush.x,y[i]-brush.y)/brush.radius):0;
    const homeDistance=Math.hypot(tx[i]-x[i],ty[i]-y[i]);
-   const spring=(22+230*Math.exp(-homeDistance*homeDistance/(s*s*12)))*(1-.98*b);ax[i]=(tx[i]-x[i])*spring;ay[i]=(ty[i]-y[i])*spring;
+   const spring=(22+230*Math.exp(-homeDistance*homeDistance/(s*s*12)))*(1-.98*b)*(1-free[i]);ax[i]=(tx[i]-x[i])*spring;ay[i]=(ty[i]-y[i])*spring+drip*free[i];
    if(brush){ax[i]+=(brush.x-x[i])*b*22*p.strength;ay[i]+=(brush.y-y[i])*b*22*p.strength;}
   }
   for(let i=0;i<n;i++){

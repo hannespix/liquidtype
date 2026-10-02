@@ -1,28 +1,46 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=83fe2b46';
-import {FluidRenderer} from '../render.mjs?v=83fe2b46';
-import {sampleGlyphs} from '../glyphs.mjs?v=83fe2b46';
-import {restrain} from './coupling.mjs?v=83fe2b46';
+import {Fluid} from '../physics.mjs?v=a104e970';
+import {FluidRenderer} from '../render.mjs?v=a104e970';
+import {sampleGlyphs} from '../glyphs.mjs?v=a104e970';
+import {restrain} from './coupling.mjs?v=a104e970';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
 const letters=[...initials.querySelectorAll('.initial')];
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
-const parameters={viscosity:.35,tension:.65,attraction:.5,strength:1.3,gravityX:0,gravityY:0};
+const parameters={viscosity:.35,tension:.65,attraction:.5,strength:1.3,gravityX:0,gravityY:0,dripGravity:1400};
 const pointer={x:0,y:0,down:false,radius:80,id:null,last:0,startX:0,startY:0,dragged:false};
 const IDLE_DELAY=5000,IDLE_FORCE=1.6;
+// Letters condense from a cloud this wide (share of the shorter canvas side).
+const ASSEMBLE_SPREAD=.38;
+// Holding a letter gathers the liquid, then it bursts; the spring lets go briefly.
+const HOLD_MS=480,BURST_SPEED=1100,BURST_FREE_MS=260;
+// Drops detach from the lowest edge every few quiet seconds and fall onto the line.
+const DRIP_MIN=5000,DRIP_MAX=9000,DRIP_FALL_MS=1300,DRIP_SIZE=2.3,CALM_SPEED=25;
+// A hovering mouse between M and S draws the liquid of both toward it.
+const MAGNET_STRENGTH=2.2,MAGNET_RADIUS=.26;
 // The home line presses on the liquid and the liquid weighs on the line.
-const LINE_LOAD_GAIN=40,LINE_LOAD_MAX=600;
+const LINE_LOAD_GAIN=40,LINE_LOAD_MAX=600,LINE_IMPACT_GAIN=.05,LINE_KICK_MAX=400;
 let renderer=null,fluid=null,w=0,h=0,last=0,accumulator=0,layoutKey='',rebuildTimer=0;
-let idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null,homeLine=null,lineLoad=0;
+let idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null,homeLine=null,lineLoad=0,lineKick=0;
+let holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+DRIP_MIN,gap=null,magnetOn=false;
+const magnet={x:0,y:0,down:true,radius:0};
+const darkScheme=matchMedia('(prefers-color-scheme: dark)');
 const isHome=()=>home.classList.contains('is-active');
 function setHint(note){
- hintText.textContent=note||(motion.active?'Antippen öffnet. Ziehen, Neigen oder Schütteln bewegt.':'Antippen öffnet. Ziehen bewegt.');
+ hintText.textContent=note||(motion.active?'Antippen öffnet. Ziehen, Neigen oder Schütteln bewegt. Halten lässt platzen.':'Antippen öffnet. Ziehen bewegt. Halten lässt platzen.');
 }
+// Paper and ink follow the stylesheet, including its dark scheme.
+function cssColor(name){
+ const value=getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+ const m=value.match(/^#([0-9a-f]{6})$/i);
+ return m?[0,2,4].map(i=>parseInt(m[1].slice(i,i+2),16)/255):null;
+}
+const colors=()=>({paper:cssColor('--paper')||[1,1,1],ink:cssColor('--ink')||[0,0,0]});
 
 // ---------------------------------------------------------------- liquid ---
 function createRenderer(){
- try{renderer=new FluidRenderer(canvas,{paper:[1,1,1],ink:[0,0,0]});w=h=0;home.classList.remove('no-liquid');}
+ try{renderer=new FluidRenderer(canvas,colors());w=h=0;home.classList.remove('no-liquid');}
  catch(error){console.warn('Liquid Type:',error);renderer=null;home.classList.add('no-liquid');}
 }
 // Where the (transparent) DOM letters sit, relative to the canvas.
@@ -55,12 +73,60 @@ function rebuild(force=false){
  if(nw!==w||nh!==h){w=nw;h=nh;renderer.resize(w,h);}
  const {points,spacing,material}=sampleGlyphs(w,h,g=>paint(g,layout),w<700?2200:4200);
  renderer.setMaterial(material);
- fluid=new Fluid(points,w,h,spacing);
+ const old=fluid;fluid=new Fluid(points,w,h,spacing);
+ // A rebuild mid-flight (font load, resize) keeps the liquid where it was.
+ if(old?.n)for(let i=0;i<fluid.n;i++){
+  const j=Math.min(old.n-1,Math.floor(i*old.n/fluid.n));
+  fluid.x[i]=clampX(fluid.tx[i]+old.x[j]-old.tx[j]);fluid.y[i]=clampY(fluid.ty[i]+old.y[j]-old.ty[j]);fluid.vx[i]=old.vx[j];fluid.vy[i]=old.vy[j];
+ }
+ drip=null;burstUntil=0;
  const left=Math.min(...layout.map(l=>l.x)),right=Math.max(...layout.map(l=>l.x+l.width));
  const size=layout[0]?.size||200;
  centre={x:(left+right)/2,y:layout[0]?layout[0].y+layout[0].height/2:h/2,rx:(right-left)*.42,ry:size*.3};
  pointer.radius=Math.max(50,Math.min(110,size*.32));
+ gap=layout.length>1?{left:layout[0].x+layout[0].width-size*.2,right:layout[1].x+size*.2,top:layout[0].y,bottom:layout[0].y+layout[0].height}:null;
+ magnet.radius=size*MAGNET_RADIUS;
  ghost=null;draw();
+}
+const clampX=v=>Math.max(fluid.spacing,Math.min(w-fluid.spacing,v));
+const clampY=v=>Math.max(fluid.spacing,Math.min(h-fluid.spacing,v));
+// The letters condense from scattered drops instead of simply appearing.
+function scatter(){
+ if(!fluid||reducedMotion.matches)return;
+ const r=Math.min(w,h)*ASSEMBLE_SPREAD;
+ for(let i=0;i<fluid.n;i++){
+  const a=Math.random()*Math.PI*2,d=r*Math.sqrt(Math.random());
+  fluid.x[i]=clampX(fluid.tx[i]+Math.cos(a)*d);fluid.y[i]=clampY(fluid.ty[i]+Math.sin(a)*d);fluid.vx[i]=fluid.vy[i]=0;
+ }
+ idleSince=performance.now();
+}
+// Everything flies away from the press point; the spring lets go for a moment.
+function burst(x,y){
+ if(!fluid)return;
+ const R=Math.max(w,h),now=performance.now();
+ for(let i=0;i<fluid.n;i++){
+  const dx=fluid.x[i]-x,dy=fluid.y[i]-y,d=Math.hypot(dx,dy)||1,f=1-d/R;
+  if(f<=0)continue;
+  const speed=BURST_SPEED*Math.sqrt(f)*(.8+.4*Math.random());
+  fluid.vx[i]=Math.max(-1500,Math.min(1500,fluid.vx[i]+dx/d*speed));fluid.vy[i]=Math.max(-1500,Math.min(1500,fluid.vy[i]+dy/d*speed));
+ }
+ if(!reducedMotion.matches){fluid.free.fill(1);burstUntil=now+BURST_FREE_MS;drip=null;}
+ pointer.down=false;pointer.dragged=true;suppressClickUntil=now+600;idleSince=now;
+ try{navigator.vibrate?.(20);}catch{/* optional */}
+}
+function calm(){let sum=0,count=0;for(let i=0;i<fluid.n;i+=37){sum+=Math.hypot(fluid.vx[i],fluid.vy[i]);count++;}return count===0||sum/count<CALM_SPEED;}
+function startDrip(t){
+ let lowest=0;for(let i=0;i<fluid.n;i++)if(fluid.ty[i]>lowest)lowest=fluid.ty[i];
+ const bottom=[];for(let i=0;i<fluid.n;i++)if(fluid.ty[i]>=lowest-fluid.spacing*2.5)bottom.push(i);
+ if(!bottom.length)return;
+ const seed=bottom[Math.floor(Math.random()*bottom.length)],sx=fluid.tx[seed],sy=fluid.ty[seed],r=fluid.spacing*DRIP_SIZE;
+ const indices=[];for(let i=0;i<fluid.n;i++)if(Math.hypot(fluid.tx[i]-sx,fluid.ty[i]-sy)<r){indices.push(i);fluid.free[i]=1;}
+ drip={indices,until:t+DRIP_FALL_MS};
+}
+function effects(t){
+ if(burstUntil&&t>burstUntil){fluid.free.fill(0);burstUntil=0;}
+ if(drip){if(t>drip.until){for(const i of drip.indices)fluid.free[i]=0;drip=null;nextDrip=t+DRIP_MIN+Math.random()*(DRIP_MAX-DRIP_MIN);}}
+ else if(t>nextDrip){if(!reducedMotion.matches&&!pointer.down&&!burstUntil&&!intro.open&&calm())startDrip(t);else nextDrip=t+800;}
 }
 function scheduleRebuild(){clearTimeout(rebuildTimer);rebuildTimer=setTimeout(()=>rebuild(),120);}
 function draw(){if(renderer&&fluid)renderer.draw(fluid);}
@@ -71,8 +137,10 @@ home.addEventListener('pointerdown',e=>{
  if(!fluid||pointer.id!==null||e.button>0||e.target.closest('a, .link, .line-hit'))return;
  const p=local(e);
  Object.assign(pointer,{x:p.x,y:p.y,startX:e.clientX,startY:e.clientY,down:true,id:e.pointerId,last:performance.now(),dragged:false});
- idleSince=performance.now();
+ idleSince=performance.now();magnetOn=false;
+ clearTimeout(holdTimer);holdTimer=setTimeout(()=>{if(pointer.down&&!pointer.dragged)burst(pointer.x,pointer.y);},HOLD_MS);
 });
+home.addEventListener('contextmenu',e=>{if(e.target.closest('.initial, .liquid'))e.preventDefault();});
 window.addEventListener('pointermove',e=>{
  if(!fluid||!isHome()||(pointer.id!==null&&e.pointerId!==pointer.id))return;
  if(pointer.down&&e.pointerType==='mouse'&&e.buttons===0)release(e);
@@ -82,18 +150,20 @@ window.addEventListener('pointermove',e=>{
   if(pointer.down)disturb(p.x,p.y,dx*16*parameters.strength,dy*16*parameters.strength,pointer.radius);
   else if(e.pointerType==='mouse'&&Math.hypot(dx,dy)<100)disturb(p.x,p.y,dx*2.5*parameters.strength,dy*2.5*parameters.strength,pointer.radius*.65);
  }
- if(pointer.down&&Math.hypot(e.clientX-pointer.startX,e.clientY-pointer.startY)>8)pointer.dragged=true;
+ if(pointer.down&&!pointer.dragged&&Math.hypot(e.clientX-pointer.startX,e.clientY-pointer.startY)>8){pointer.dragged=true;clearTimeout(holdTimer);}
+ magnetOn=!pointer.down&&e.pointerType==='mouse'&&!!gap&&p.x>gap.left&&p.x<gap.right&&p.y>gap.top&&p.y<gap.bottom;
+ magnet.x=p.x;magnet.y=p.y;
  pointer.x=p.x;pointer.y=p.y;pointer.last=now;idleSince=now;
 },{passive:true});
 function release(e){
  if(pointer.id===null||(e&&e.pointerId!==pointer.id))return;
  // A drag that ends on a letter must not also open "Über mich".
- if(pointer.dragged)suppressClickUntil=performance.now()+400;
- pointer.down=false;pointer.id=null;pointer.dragged=false;
+ if(pointer.dragged)suppressClickUntil=Math.max(suppressClickUntil,performance.now()+400);
+ clearTimeout(holdTimer);pointer.down=false;pointer.id=null;pointer.dragged=false;
 }
 window.addEventListener('pointerup',release);
 window.addEventListener('pointercancel',release);
-document.documentElement.addEventListener('pointerleave',()=>{if(!pointer.down)pointer.last=0;});
+document.documentElement.addEventListener('pointerleave',()=>{if(!pointer.down)pointer.last=0;magnetOn=false;});
 initials.addEventListener('click',e=>{if(performance.now()<suppressClickUntil){e.stopPropagation();e.preventDefault();}},true);
 // Arrow keys on a focused letter send a wave through the liquid.
 initials.addEventListener('keydown',e=>{
@@ -115,16 +185,18 @@ function frame(t){
  if(document.hidden||!isHome()){last=0;return;}
  const dt=last?Math.min(.04,(t-last)/1000):0;last=t;
  // The home line runs on the same clock as the liquid, so both can push each other.
- homeLine?.step(dt,Math.min(LINE_LOAD_MAX,lineLoad)*LINE_LOAD_GAIN);
+ homeLine?.step(dt,Math.min(LINE_LOAD_MAX,lineLoad)*LINE_LOAD_GAIN,lineKick);lineKick=0;
  if(!fluid||!renderer)return;
- settleMotion(t);idleMotion(t);
+ settleMotion(t);idleMotion(t);effects(t);
  accumulator=Math.min(.04,accumulator+dt);
  if(accumulator>=1/120){
   const box=home.getBoundingClientRect(),shape=homeLine?.shape();
   const line=shape&&{top:shape.top-box.top,width:shape.width,anchor:shape.anchor,offset:shape.offset,rate:shape.rate,shift:box.left};
+  const brush=pointer.down?pointer:magnetOn&&!reducedMotion.matches?magnet:null;
+  const prm=brush===magnet?{...parameters,strength:MAGNET_STRENGTH}:parameters;
   while(accumulator>=1/120){
-   fluid.step(1/120,parameters,pointer);
-   if(line)lineLoad=restrain(fluid,line);
+   fluid.step(1/120,prm,brush);
+   if(line){const hit=restrain(fluid,line);lineLoad=hit.load;lineKick+=Math.min(LINE_KICK_MAX,hit.impact*LINE_IMPACT_GAIN);}
    accumulator-=1/120;
   }
  }
@@ -132,6 +204,7 @@ function frame(t){
 }
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();renderer=null;fluid=null;home.classList.add('no-liquid');});
 canvas.addEventListener('webglcontextrestored',()=>{createRenderer();rebuild(true);});
+darkScheme.addEventListener('change',()=>{const c=colors();renderer?.setColors(c.paper,c.ink);draw();});
 new ResizeObserver(scheduleRebuild).observe(home);
 new ResizeObserver(scheduleRebuild).observe(initials);
 document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;release({pointerId:pointer.id});resetMotion();});
@@ -146,6 +219,8 @@ document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;release({
 const SHAKE_GAIN=650,TILT_GAIN=90,LEAN_GAIN=120,LEAN_RELAX=2,NUDGE_LIMIT=260,SENSOR_TIMEOUT=300,SENSOR_WAIT=2500;
 const motion={active:false,gravity:null,pose:null,last:0,events:0,waiting:0};
 const debug=new URLSearchParams(location.search).has('debug')?Object.assign(document.body.appendChild(document.createElement('pre')),{className:'debug'}):null;
+// With ?debug the running simulation is reachable from the console for tuning.
+if(debug)window.liquidType={get fluid(){return fluid;},get drip(){return drip;},get parameters(){return parameters;},get motion(){return motion;}};
 // Device frame (x right, y up in portrait) to canvas frame (x right, y down)
 // as the direction the liquid moves: opposite to the device's own acceleration.
 function liquidDirection(x,y){
@@ -211,7 +286,7 @@ function show(name,focus=true){
  back.hidden=name==='home';crumb.textContent=label;
  document.title=name==='home'?baseTitle:`${label} — Matthias Sütterlin`;
  window.scrollTo(0,0);
- if(name==='home'){release({pointerId:pointer.id});last=0;idleSince=performance.now();resetMotion();requestAnimationFrame(()=>rebuild());}
+ if(name==='home'){release({pointerId:pointer.id});last=0;idleSince=performance.now();resetMotion();requestAnimationFrame(()=>{rebuild();scatter();});}
  if(focus)(name==='home'?letters[0]:views.get(name).querySelector('h2'))?.focus({preventScroll:true});
 }
 function go(name){
@@ -250,10 +325,11 @@ function pluckable(host,driven=false){
   for(const el of [svg,hit]){el.style.left=-left+'px';el.style.width=width+'px';}
   render();
  }
- // Damped spring; `load` is an extra downward acceleration from whatever rests on the line.
- function step(dt,load=0){
-  if(!grabbed&&(offset||velocity||load)){
-   velocity+=(-620*offset+load)*dt;velocity*=Math.exp(-4.2*dt);offset+=velocity*dt;
+ // Damped spring; `load` is an extra downward acceleration from whatever rests
+ // on the line, `kick` a downward velocity from whatever just landed on it.
+ function step(dt,load=0,kick=0){
+  if(!grabbed&&(offset||velocity||load||kick)){
+   velocity+=(-620*offset+load)*dt+kick;velocity*=Math.exp(-4.2*dt);offset+=velocity*dt;
    if(!load&&Math.abs(offset)<.15&&Math.abs(velocity)<3)offset=velocity=0;
    render();
   }
@@ -299,5 +375,6 @@ if(!introSeen&&current==='home'&&typeof intro.showModal==='function'){intro.show
 createRenderer();
 try{await document.fonts?.load('700 100px "Playfair Display"');}catch{/* fallback serif */}
 rebuild(true);
+if(intro.open)intro.addEventListener('close',scatter,{once:true});else scatter();
 document.fonts?.ready.then(()=>rebuild());
 requestAnimationFrame(frame);
