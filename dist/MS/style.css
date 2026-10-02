@@ -45,6 +45,8 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .and{opacity:.4}
 .home .line{margin:.6rem 0 0}
 .hint{margin:2.5rem 0 0;font-size:14px;letter-spacing:.06em;opacity:.45}
+.hint .link{margin-left:.3em;opacity:1}
+.hint .link[hidden]{display:none}
 .credit{position:absolute;z-index:1;left:1.25rem;right:1.25rem;bottom:1rem;margin:0;text-align:center;font-size:12px;letter-spacing:.04em;opacity:.5}
 
 /* Pluckable lines */

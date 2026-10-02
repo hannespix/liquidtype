@@ -56,6 +56,8 @@ Unter `/MS/` liegt eine Studie der Website von Matthias Sütterlin (Innenarchite
 - Die Seite ist auf `noindex` gesetzt und verweist per `canonical` auf das Original, damit Suchmaschinen keine Dublette führen.
 - Die Schrift Playfair Display (Bold, lateinischer Zeichensatz) liegt selbst gehostet in `src/MS/fonts/` mit ihrer Lizenz (SIL Open Font License 1.1). Es werden keine externen Dienste geladen.
 - Bereiche sind per Adresse erreichbar, zum Beispiel `/MS/#projects`; Browser-Zurück funktioniert.
+- Die zupfbare Linie unter der Tagline ist eine echte Grenze für die Flüssigkeit: Nach oben gezogen hebt sie die Buchstabenböden an, nach dem Loslassen schwingt sie durch die Schrift. Flüssigkeit, die nach unten gezogen wird, sammelt sich auf der Linie und drückt sie durch.
+- Am Smartphone bewegen Neigen und Schütteln die Buchstaben (Beschleunigungssensor). Android startet automatisch, iOS fragt nach einem Tipp auf „Schütteln einschalten“. Die Haltung des Geräts wird laufend als Ruhelage übernommen, nur die Abweichung davon wirkt.
 - Ohne WebGL2 erscheinen die Initialen als normale Schrift.
 
 ## Technische Grenzen

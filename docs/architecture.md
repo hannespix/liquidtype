@@ -16,6 +16,10 @@ Die zuletzt ausgelieferte Offline-Datei ist die Grundlage dieses Quellstands. Di
 
 Die MS-Seite legt die Leinwand über den ganzen Startbereich, damit Spritzer nicht an einer Buchstabenbox abgeschnitten werden. Ein kurzer Tipp öffnet „Über mich“, ein Ziehen über acht Pixel verformt nur die Flüssigkeit. Nach fünf Sekunden Ruhe bewegt eine unsichtbare Hand die Oberfläche sanft, außer bei reduzierter Bewegung.
 
+Die zupfbare Linie der Startseite läuft im selben Takt wie die Flüssigkeit. Nach jedem Physikschritt hält `coupling.mjs` alle Partikel oberhalb der Bézierkurve, gibt ihnen die Geschwindigkeit der Linie mit und zählt, wie viele aufliegen. Diese Last wirkt im nächsten Bild als Beschleunigung auf die Feder der Linie, sodass Tropfen sie durchbiegen und die zurückschwingende Linie von der Schrift gebremst wird. Die Kurveninversion und die Grenze sind in `tests/coupling.test.mjs` geprüft.
+
+Bewegungssensoren liefern eine gleichförmige Kraft als `gravityX`/`gravityY` an die Physik: die Abweichung der aktuellen Schwerkraft von einer langsam nachgeführten Ruhelage (Neigen) plus die lineare Beschleunigung (Schütteln), gedreht nach Bildschirmausrichtung und begrenzt. Bleiben Sensordaten aus, fällt die Kraft auf null. Die Rückstellfeder der Schrift ist nahe der Ruhelage steif, deshalb lehnt sich die Schrift bei kleinem Neigen nur leicht und rutscht erst ab etwa 25 Grad als Ganzes, bis die Ruhelage nachgezogen ist.
+
 Wenn `EXT_color_buffer_float` verfügbar ist, verwendet die Summentextur RGBA16F; andernfalls RGBA8. Die Schrift wird ausschließlich über denselben Partikel-Renderpfad ausgegeben. Die Materialmaske wird nicht als separate Schriftebene angezeigt.
 
 ## Prüfstand

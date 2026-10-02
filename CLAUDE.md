@@ -10,6 +10,8 @@ Statische Browseranwendung: Schrift als 2D-Flüssigkeit mit WebGL2-Rendering. Ke
 
 Seiten: Hauptseite `src/index.html` mit `src/app.mjs`; Unterseite `src/MS/` (Matthias Sütterlin, flüssige Initialen). Beide nutzen die gemeinsamen Engine-Module `physics.mjs`, `render.mjs` und `glyphs.mjs`. Neue Unterseiten als eigenen Ordner unter `src/` anlegen und in `scripts/build.mjs` in die Ordnerliste aufnehmen.
 
+Die Physik kennt optional `gravityX`/`gravityY` in den Parametern (px/s²); `src/MS/coupling.mjs` lässt die Flüssigkeit auf der zupfbaren Linie aufliegen. Die Sensor-Verstärkungen stehen oben im Abschnitt „motion“ von `src/MS/ms.mjs` (`TILT_GAIN`, `SHAKE_GAIN`, `FORCE_LIMIT`, `POSE_RELAX`) und sind nur am echten Gerät abstimmbar.
+
 Änderungen immer in `src/` vornehmen. `dist/` und `Liquid-Type-Offline.html` sind eingecheckt und werden ausschließlich vom Build erzeugt: nach jeder Quelländerung `npm run build` ausführen und die erzeugten Dateien im selben Commit mitführen. Die CI bricht ab, wenn sie nicht zum Quellstand passen.
 
 Keine neuen Laufzeitabhängigkeiten einführen. Oberfläche, Dokumentation und Commit-Texte auf Deutsch; Code-Kommentare dürfen Englisch bleiben.

@@ -2,16 +2,19 @@
 import {Fluid} from '../physics.mjs';
 import {FluidRenderer} from '../render.mjs';
 import {sampleGlyphs} from '../glyphs.mjs';
+import {restrain} from './coupling.mjs';
 
 const $=id=>document.getElementById(id);
-const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb');
+const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
 const letters=[...initials.querySelectorAll('.initial')];
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
-const parameters={viscosity:.35,tension:.65,attraction:.5,strength:1.3};
+const parameters={viscosity:.35,tension:.65,attraction:.5,strength:1.3,gravityX:0,gravityY:0};
 const pointer={x:0,y:0,down:false,radius:80,id:null,last:0,startX:0,startY:0,dragged:false};
 const IDLE_DELAY=5000,IDLE_FORCE=1.6;
+// The home line presses on the liquid and the liquid weighs on the line.
+const LINE_LOAD_GAIN=40,LINE_LOAD_MAX=600;
 let renderer=null,fluid=null,w=0,h=0,last=0,accumulator=0,layoutKey='',rebuildTimer=0;
-let idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null;
+let idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null,homeLine=null,lineLoad=0;
 const isHome=()=>home.classList.contains('is-active');
 
 // ---------------------------------------------------------------- liquid ---
@@ -106,18 +109,71 @@ function idleMotion(t){
 }
 function frame(t){
  requestAnimationFrame(frame);
- if(document.hidden||!isHome()||!fluid||!renderer){last=0;return;}
+ if(document.hidden||!isHome()){last=0;return;}
  const dt=last?Math.min(.04,(t-last)/1000):0;last=t;
- idleMotion(t);
+ // The home line runs on the same clock as the liquid, so both can push each other.
+ homeLine?.step(dt,Math.min(LINE_LOAD_MAX,lineLoad)*LINE_LOAD_GAIN);
+ if(!fluid||!renderer)return;
+ settleMotion(t);idleMotion(t);
  accumulator=Math.min(.04,accumulator+dt);
- while(accumulator>=1/120){fluid.step(1/120,parameters,pointer);accumulator-=1/120;}
+ if(accumulator>=1/120){
+  const box=home.getBoundingClientRect(),shape=homeLine?.shape();
+  const line=shape&&{top:shape.top-box.top,width:shape.width,anchor:shape.anchor,offset:shape.offset,rate:shape.rate,shift:box.left};
+  while(accumulator>=1/120){
+   fluid.step(1/120,parameters,pointer);
+   if(line)lineLoad=restrain(fluid,line);
+   accumulator-=1/120;
+  }
+ }
  draw();
 }
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();renderer=null;fluid=null;home.classList.add('no-liquid');});
 canvas.addEventListener('webglcontextrestored',()=>{createRenderer();rebuild(true);});
 new ResizeObserver(scheduleRebuild).observe(home);
 new ResizeObserver(scheduleRebuild).observe(initials);
-document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;release({pointerId:pointer.id});});
+document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;release({pointerId:pointer.id});resetMotion();});
+
+// ----------------------------------------------------------------- motion ---
+// Phone sensors. Tilting away from the current holding pose lets the liquid
+// flow, shaking sends waves through it. Gains are px/s² per m/s² of device
+// acceleration; the pose relaxes within a few seconds so a new way of
+// holding the phone becomes neutral again.
+const TILT_GAIN=500,SHAKE_GAIN=700,FORCE_LIMIT=14000,POSE_RELAX=4,SENSOR_TIMEOUT=250;
+const motion={active:false,gravity:null,pose:null,last:0};
+// Device frame (x right, y up in portrait) to canvas frame (x right, y down)
+// as the direction the liquid moves: opposite to the device's own acceleration.
+function liquidDirection(x,y){
+ const angle=(screen.orientation?.angle??window.orientation??0)*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
+ return {x:-(x*c-y*s),y:x*s+y*c};
+}
+function onMotion(e){
+ const g=e.accelerationIncludingGravity;
+ if(!g||g.x==null||g.y==null)return;
+ const now=performance.now(),dt=motion.last?Math.min(.1,(now-motion.last)/1000):0;motion.last=now;
+ if(!motion.active){motion.active=true;motionButton.hidden=true;hintText.textContent='Antippen öffnet. Ziehen, Neigen oder Schütteln bewegt.';}
+ if(!motion.gravity){motion.gravity={x:g.x,y:g.y};motion.pose={x:g.x,y:g.y};return;}
+ const fast=1-Math.exp(-dt*8),slow=1-Math.exp(-dt/POSE_RELAX);
+ motion.gravity.x+=(g.x-motion.gravity.x)*fast;motion.gravity.y+=(g.y-motion.gravity.y)*fast;
+ motion.pose.x+=(motion.gravity.x-motion.pose.x)*slow;motion.pose.y+=(motion.gravity.y-motion.pose.y)*slow;
+ const a=e.acceleration,ax=a&&a.x!=null?a.x:g.x-motion.gravity.x,ay=a&&a.y!=null?a.y:g.y-motion.gravity.y;
+ const tilt=liquidDirection(motion.gravity.x-motion.pose.x,motion.gravity.y-motion.pose.y),shake=liquidDirection(ax,ay);
+ let fx=tilt.x*TILT_GAIN+shake.x*SHAKE_GAIN,fy=tilt.y*TILT_GAIN+shake.y*SHAKE_GAIN;
+ const m=Math.hypot(fx,fy);if(m>FORCE_LIMIT){fx*=FORCE_LIMIT/m;fy*=FORCE_LIMIT/m;}
+ parameters.gravityX=fx;parameters.gravityY=fy;
+ if(m>600)idleSince=now;
+}
+// Without fresh sensor data the force must not linger.
+function settleMotion(t){if(motion.last&&t-motion.last>SENSOR_TIMEOUT)parameters.gravityX=parameters.gravityY=0;}
+function resetMotion(){parameters.gravityX=parameters.gravityY=0;motion.gravity=null;motion.last=0;}
+function startMotion(){window.addEventListener('devicemotion',onMotion,{passive:true});}
+const touchDevice=navigator.maxTouchPoints>0||matchMedia('(pointer: coarse)').matches;
+if(touchDevice&&'DeviceMotionEvent' in window&&!reducedMotion.matches){
+ if(typeof DeviceMotionEvent.requestPermission==='function'){
+  // iOS asks once, and only from a tap.
+  motionButton.hidden=false;
+  motionButton.addEventListener('click',()=>{DeviceMotionEvent.requestPermission().then(state=>{if(state==='granted')startMotion();}).catch(()=>{}).finally(()=>{motionButton.hidden=true;});});
+ }else startMotion();
+}
 
 // ------------------------------------------------------------ navigation ---
 const views=new Map([...document.querySelectorAll('.view')].map(v=>[v.dataset.view,v]));
@@ -134,7 +190,7 @@ function show(name,focus=true){
  back.hidden=name==='home';crumb.textContent=label;
  document.title=name==='home'?baseTitle:`${label} — Matthias Sütterlin`;
  window.scrollTo(0,0);
- if(name==='home'){release({pointerId:pointer.id});last=0;idleSince=performance.now();requestAnimationFrame(()=>rebuild());}
+ if(name==='home'){release({pointerId:pointer.id});last=0;idleSince=performance.now();resetMotion();requestAnimationFrame(()=>rebuild());}
  if(focus)(name==='home'?letters[0]:views.get(name).querySelector('h2'))?.focus({preventScroll:true});
 }
 function go(name){
@@ -154,34 +210,44 @@ intro.addEventListener('click',e=>{if(e.target===intro)closeIntro();});
 
 // ------------------------------------------------------- pluckable lines ---
 const SVG='http://www.w3.org/2000/svg';
-function pluckable(host){
+// A thin line that grabs the pointer when crossed, follows it, snaps free and
+// swings out. A `driven` line is stepped by the caller instead of its own
+// timer and reports its shape, so the liquid can rest on it.
+function pluckable(host,driven=false){
  host.classList.add('line');host.setAttribute('aria-hidden','true');
  const svg=document.createElementNS(SVG,'svg'),path=document.createElementNS(SVG,'path'),hit=document.createElement('div');
  hit.className='line-hit';svg.append(path);host.append(svg,hit);
  const mid=200;
- let width=0,offset=0,velocity=0,anchor=.5,grabbed=false,previous=null,raf=0,then=0;
+ let width=0,offset=0,velocity=0,rate=0,previousOffset=0,anchor=.5,grabbed=false,previous=null,raf=0,then=0;
  const snap=()=>Math.max(70,Math.min(160,innerHeight*.18));
+ const clamped=()=>Math.max(-snap(),Math.min(snap(),offset));
  function render(){
-  const o=Math.max(-snap(),Math.min(snap(),offset));
-  path.setAttribute('d',`M0 ${mid} Q${(width*anchor).toFixed(1)} ${(mid+o*2).toFixed(1)} ${width} ${mid}`);
+  path.setAttribute('d',`M0 ${mid} Q${(width*anchor).toFixed(1)} ${(mid+clamped()*2).toFixed(1)} ${width} ${mid}`);
  }
  function fit(){
   const left=host.getBoundingClientRect().left;width=document.documentElement.clientWidth;
   for(const el of [svg,hit]){el.style.left=-left+'px';el.style.width=width+'px';}
   render();
  }
- // Damped spring: the released line swings out and settles.
+ // Damped spring; `load` is an extra downward acceleration from whatever rests on the line.
+ function step(dt,load=0){
+  if(!grabbed&&(offset||velocity||load)){
+   velocity+=(-620*offset+load)*dt;velocity*=Math.exp(-4.2*dt);offset+=velocity*dt;
+   if(!load&&Math.abs(offset)<.15&&Math.abs(velocity)<3)offset=velocity=0;
+   render();
+  }
+  const now=clamped();rate=dt>0?(now-previousOffset)/dt:0;previousOffset=now;
+  return grabbed||offset!==0||velocity!==0;
+ }
  function swing(t){
   const dt=then?Math.min(1/30,(t-then)/1000):1/60;then=t;
-  velocity+=-620*offset*dt;velocity*=Math.exp(-4.2*dt);offset+=velocity*dt;
-  if(Math.abs(offset)<.15&&Math.abs(velocity)<3){offset=velocity=0;raf=0;then=0;render();return;}
-  render();raf=requestAnimationFrame(swing);
+  if(step(dt))raf=requestAnimationFrame(swing);else{raf=0;then=0;}
  }
  function grab(){grabbed=true;cancelAnimationFrame(raf);raf=0;then=0;velocity=0;}
  function letGo(){
   if(!grabbed)return;grabbed=false;
-  offset=Math.max(-snap(),Math.min(snap(),offset));
-  if(reducedMotion.matches){offset=0;render();}else if(!raf)raf=requestAnimationFrame(swing);
+  offset=clamped();
+  if(reducedMotion.matches){offset=0;render();}else if(!driven&&!raf)raf=requestAnimationFrame(swing);
  }
  function follow(e){
   if(!host.offsetParent){previous=null;return;}
@@ -200,9 +266,10 @@ function pluckable(host){
  new ResizeObserver(fit).observe(host);
  window.addEventListener('resize',fit,{passive:true});
  fit();
+ return {step,shape(){return {top:host.getBoundingClientRect().top,width,anchor,offset:clamped(),rate};}};
 }
 document.querySelectorAll('.panel h2').forEach(h2=>{const line=document.createElement('div');h2.after(line);pluckable(line);});
-document.querySelectorAll('[data-line]').forEach(pluckable);
+homeLine=pluckable(document.querySelector('[data-line]'),true);
 
 // ----------------------------------------------------------------- start ---
 show(viewFromHash(),false);
