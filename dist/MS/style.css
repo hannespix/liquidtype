@@ -28,9 +28,20 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .crumb{margin:0;opacity:.55}
 
 /* Views */
+#views{position:relative}
 .view{min-height:100vh;min-height:100dvh;padding:clamp(4rem,10vw,7rem) clamp(1.25rem,6vw,5rem);display:none}
 .view.is-active{display:flex;align-items:center;justify-content:center;animation:enter .45s var(--ease)}
 @keyframes enter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+/* Liquid hand-over: the target view lies over the home view while the
+   initials flow into its heading; then heading and text take over. */
+.view.is-arriving{position:absolute;top:0;left:0;right:0;z-index:2;animation:none}
+.view.is-arriving .panel h2{visibility:hidden}
+.view.is-arriving .panel>:not(h2){opacity:0;transition:opacity .4s var(--ease)}
+.view.is-arriving.is-revealed .panel h2{visibility:visible}
+.view.is-arriving.is-revealed .panel>:not(h2){opacity:1}
+.view-home.is-leaving .home,.view-home.is-leaving .credit{opacity:0;transition:opacity .25s}
+.liquid{transition:opacity .35s var(--ease)}
+.liquid.is-fading{opacity:0}
 
 /* Home with liquid initials */
 .view-home{position:relative;overflow:clip;min-height:100svh}
