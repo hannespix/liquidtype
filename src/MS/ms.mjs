@@ -490,16 +490,24 @@ function buildTune(){
   const name=document.createElement('span');name.textContent=label;
   const out=document.createElement('output');
   const input=document.createElement('input');input.type='range';input.min=String(min);input.max=String(max);input.step=String(step);
-  const show=()=>{const v=(target||tune)[key];input.value=String(v);out.value=step<1?v.toFixed(step<.01?3:2):String(Math.round(v));};
+  const show=()=>{const v=(target||tune)[key];input.value=String(v);input.style.setProperty('--fill',((v-min)/(max-min)*100).toFixed(1)+'%');out.value=step<1?v.toFixed(step<.01?3:2):String(Math.round(v));};
   input.addEventListener('input',()=>{(target||tune)[key]=Number(input.value);show();saveTune();values.value=JSON.stringify(tuneValues());});
   row.append(name,out,input);body.append(row);inputs.push(show);show();
  }
  const refresh=()=>{for(const show of inputs)show();values.value=JSON.stringify(tuneValues());};
  refresh();
  $('tuneReset').addEventListener('click',()=>{Object.assign(tune,defaults);Object.assign(parameters,physicsDefaults);try{localStorage.removeItem(TUNE_KEY);}catch{/* storage unavailable */}refresh();});
- $('tuneCopy').addEventListener('click',()=>{values.select();navigator.clipboard?.writeText(values.value).catch(()=>{});});
+ const copy=$('tuneCopy');
+ copy.addEventListener('click',()=>{
+  const json=JSON.stringify(tuneValues());values.value=json;
+  (navigator.clipboard?.writeText(json)||Promise.reject()).then(()=>{copy.textContent='Kopiert';setTimeout(()=>{copy.textContent='Kopieren';},1500);}).catch(()=>{panel.classList.add('has-values');values.focus();values.select();});
+ });
  const toggle=$('tuneToggle'),panel=$('tune');
- toggle.addEventListener('click',()=>{const open=panel.hidden;panel.hidden=!open;toggle.setAttribute('aria-expanded',String(open));});
+ const openTune=open=>{panel.classList.toggle('is-open',open);panel.inert=!open;toggle.setAttribute('aria-expanded',String(open));};
+ toggle.addEventListener('click',()=>openTune(!panel.classList.contains('is-open')));
+ $('tuneClose').addEventListener('click',()=>openTune(false));
+ document.addEventListener('pointerdown',e=>{if(panel.classList.contains('is-open')&&!e.target.closest('.tune, .tune-toggle'))openTune(false);});
+ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&panel.classList.contains('is-open')){e.stopImmediatePropagation();openTune(false);}},true);
 }
 loadTune();buildTune();
 

@@ -1,6 +1,6 @@
-import {Fluid} from './physics.mjs?v=7c1d610b';
-import {FluidRenderer} from './render.mjs?v=7c1d610b';
-import {sampleGlyphs} from './glyphs.mjs?v=7c1d610b';
+import {Fluid} from './physics.mjs?v=6b9b86ef';
+import {FluidRenderer} from './render.mjs?v=6b9b86ef';
+import {sampleGlyphs} from './glyphs.mjs?v=6b9b86ef';
 const $=id=>document.getElementById(id);
 const canvas=$('fluid'),wrap=$('canvasWrap'),input=$('textInput'),cursor=$('cursor');
 // No alternate text layer: the only visible typography is the particle surface.
