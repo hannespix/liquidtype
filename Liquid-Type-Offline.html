@@ -161,6 +161,8 @@ precision highp float;
 in vec2 uv;
 uniform sampler2D density;
 uniform vec2 texel;
+uniform vec3 paper;
+uniform vec3 ink;
 out vec4 color;
 void main(){
  vec3 sums=texture(density,uv).rgb;
@@ -172,11 +174,13 @@ void main(){
  v*=smoothstep(.006,.024,coverage);
  float aa=max(fwidth(v)*.65,.012);
  float body=smoothstep(.51-aa,.51+aa,v);
- color=vec4(mix(vec3(.973,.973,.957),vec3(.016,.020,.019),body),1.);
+ color=vec4(mix(paper,ink,body),1.);
 
 }`;
 class FluidRenderer {
- constructor(canvas){
+ // Colours are linear 0..1 RGB triples; the defaults match the main Liquid Type page.
+ constructor(canvas,{paper=[.973,.973,.957],ink=[.016,.020,.019]}={}){
+  this.paper=paper;this.ink=ink;
   const gl=canvas.getContext('webgl2',{alpha:false,antialias:false,powerPreference:'high-performance',depth:false,stencil:false});
   if(!gl)throw new Error('WebGL2 ist auf diesem Gerät nicht verfügbar.');
   this.gl=gl;this.canvas=canvas;this.floatSurface=!!gl.getExtension('EXT_color_buffer_float');
@@ -217,10 +221,40 @@ class FluidRenderer {
   gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.uniform1i(gl.getUniformLocation(this.points,'glyphMaterial'),1);gl.uniform2f(gl.getUniformLocation(this.points,'pixelScale'),this.canvas.width/this.w,this.canvas.height/this.h);gl.uniform1f(gl.getUniformLocation(this.points,'radius'),fluid.spacing*2.1);
   gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE);gl.drawArrays(gl.POINTS,0,fluid.n);gl.disable(gl.BLEND);
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.useProgram(this.surface);gl.bindVertexArray(null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.texture);
-  gl.uniform1i(gl.getUniformLocation(this.surface,'density'),0);gl.uniform2f(gl.getUniformLocation(this.surface,'texel'),1/this.canvas.width,1/this.canvas.height);gl.drawArrays(gl.TRIANGLES,0,3);
+  gl.uniform1i(gl.getUniformLocation(this.surface,'density'),0);gl.uniform2f(gl.getUniformLocation(this.surface,'texel'),1/this.canvas.width,1/this.canvas.height);gl.uniform3fv(gl.getUniformLocation(this.surface,'paper'),this.paper);gl.uniform3fv(gl.getUniformLocation(this.surface,'ink'),this.ink);gl.drawArrays(gl.TRIANGLES,0,3);
  }
 }
 
+
+// Glyph sampling shared by every Liquid Type page.
+// `draw(ctx)` paints the ink in CSS pixels; it is called twice: once on a 1x
+// canvas whose coverage becomes the particle lattice, and once on a
+// high-resolution canvas that the renderer uses as material texture.
+function sampleGlyphs(width,height,draw,budget){
+ const c=document.createElement('canvas');c.width=Math.ceil(width);c.height=Math.ceil(height);
+ const ctx=c.getContext('2d',{willReadFrequently:true});draw(ctx);
+ // High-resolution glyph coverage is material data for the particles, never a
+ // screen-space text image, SVG overlay, opacity layer or alternative renderer.
+ const material=document.createElement('canvas');const scale=Math.min(devicePixelRatio||1,2);material.width=Math.ceil(width*scale);material.height=Math.ceil(height*scale);
+ const mc=material.getContext('2d');mc.scale(material.width/width,material.height/height);draw(mc);
+ const rgba=ctx.getImageData(0,0,c.width,c.height).data;
+ let area=0;for(let i=3;i<rgba.length;i+=4)area+=rgba[i]/255;
+ let spacing=Math.max(2.5,Math.sqrt(area/(budget*.8)));
+ let points=[];
+ // Keep a complete lattice cell for every ink intersection, including fine serifs.
+ for(let attempt=0;attempt<3;attempt++){
+  points=[];
+  for(let y=0;y<height;y+=spacing)for(let x=0;x<width;x+=spacing){
+   let ink=false;
+   for(let yy=Math.floor(y);yy<Math.min(height,y+spacing)&&!ink;yy++)for(let xx=Math.floor(x);xx<Math.min(width,x+spacing);xx++){
+    if(rgba[(yy*c.width+xx)*4+3]>0){ink=true;break;}
+   }
+   if(ink)points.push({x:x+spacing*.5,y:y+spacing*.5});
+  }
+  if(points.length<=budget)break;spacing*=Math.sqrt(points.length/budget)*1.03;
+ }
+ return {points,spacing,material};
+}
 
 const $=id=>document.getElementById(id);
 const canvas=$('fluid'),wrap=$('canvasWrap'),input=$('textInput'),cursor=$('cursor');
@@ -245,30 +279,12 @@ function setParameter(name,value){
 controls.forEach(name=>{$(name).addEventListener('input',e=>setParameter(name,e.target.value));setParameter(name,$(name).value);});
 function maskPoints(text,width,height){
  if(!text.trim()){const blank=document.createElement('canvas');blank.width=blank.height=1;renderer?.setMaterial(blank);return{points:[],spacing:5};}
- const c=document.createElement('canvas');c.width=Math.ceil(width);c.height=Math.ceil(height);const ctx=c.getContext('2d',{willReadFrequently:true});
+ const ctx=document.createElement('canvas').getContext('2d');
  let size=Math.min(height*.63,width*.7,330);ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
  const measured=ctx.measureText(text).width;size*=Math.min(1,width*.86/Math.max(1,measured));ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
- const m=ctx.measureText(text);ctx.textAlign='center';ctx.fillStyle='black';ctx.fillText(text,width/2,height/2+(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2);
- // High-resolution glyph coverage is material data for the particles, never a
- // screen-space text image, SVG overlay, opacity layer or alternative renderer.
- const material=document.createElement('canvas');const scale=Math.min(devicePixelRatio||1,2);material.width=Math.ceil(width*scale);material.height=Math.ceil(height*scale);
- const mc=material.getContext('2d');mc.scale(material.width/width,material.height/height);mc.font=ctx.font;mc.textAlign='center';mc.fillStyle='black';mc.fillText(text,width/2,height/2+(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2);renderer?.setMaterial(material);
- const rgba=ctx.getImageData(0,0,c.width,c.height).data;
- let area=0;for(let i=3;i<rgba.length;i+=4)area+=rgba[i]/255;
- const budget=width<700?2200:4200;let spacing=Math.max(2.5,Math.sqrt(area/(budget*.8)));
- let points=[];
- // Keep a complete lattice cell for every ink intersection, including fine serifs.
- for(let attempt=0;attempt<3;attempt++){
-  points=[];
-  for(let y=0;y<height;y+=spacing)for(let x=0;x<width;x+=spacing){
-   let ink=false;
-   for(let yy=Math.floor(y);yy<Math.min(height,y+spacing)&&!ink;yy++)for(let xx=Math.floor(x);xx<Math.min(width,x+spacing);xx++){
-    if(rgba[(yy*c.width+xx)*4+3]>0){ink=true;break;}
-   }
-   if(ink)points.push({x:x+spacing*.5,y:y+spacing*.5});
-  }
-  if(points.length<=budget)break;spacing*=Math.sqrt(points.length/budget)*1.03;
- }
+ const m=ctx.measureText(text),font=ctx.font,baseline=height/2+(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2;
+ const {points,spacing,material}=sampleGlyphs(width,height,g=>{g.font=font;g.textAlign='center';g.fillStyle='black';g.fillText(text,width/2,baseline);},width<700?2200:4200);
+ renderer?.setMaterial(material);
  return {points,spacing};
 }
 function setText(value,animate=true){

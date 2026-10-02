@@ -10,6 +10,12 @@ Die zuletzt ausgelieferte Offline-Datei ist die Grundlage dieses Quellstands. Di
 4. Jeder Partikel trägt lokale Materialinformationen. Glatte, sich überlappende Gewichte werden in einer WebGL-Textur aufsummiert und normalisiert.
 5. Tatsächliche Auslenkung und Geschwindigkeit bestimmen die lokale Verformung zur freien Flüssigkeitsoberfläche. Es gibt keine SVG-Schriftüberlagerung, keine zeitgesteuerte Ruhebild-Überblendung und keine rechteckigen Schnittkanten der Partikel.
 
+## Gemeinsame Engine und Unterseiten
+
+`glyphs.mjs` tastet beliebig gezeichnete Schrift ab: Eine Zeichenfunktion malt die Glyphen einmal in ein 1×-Raster für die Partikel und einmal hochaufgelöst als Materialtextur. Die Hauptseite zentriert damit ihren Text, die MS-Seite zeichnet M und S exakt in die Flächen ihrer unsichtbaren Schaltflächen. `FluidRenderer` nimmt optional Papier- und Tintenfarbe entgegen; ohne Angabe gelten die Farben der Hauptseite. Nach dem Auslagern wurde die Hauptseite im Browser pixelgenau mit dem vorherigen Stand verglichen.
+
+Die MS-Seite legt die Leinwand über den ganzen Startbereich, damit Spritzer nicht an einer Buchstabenbox abgeschnitten werden. Ein kurzer Tipp öffnet „Über mich“, ein Ziehen über acht Pixel verformt nur die Flüssigkeit. Nach fünf Sekunden Ruhe bewegt eine unsichtbare Hand die Oberfläche sanft, außer bei reduzierter Bewegung.
+
 Wenn `EXT_color_buffer_float` verfügbar ist, verwendet die Summentextur RGBA16F; andernfalls RGBA8. Die Schrift wird ausschließlich über denselben Partikel-Renderpfad ausgegeben. Die Materialmaske wird nicht als separate Schriftebene angezeigt.
 
 ## Prüfstand
