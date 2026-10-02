@@ -24,20 +24,24 @@ export class Fluid {
  // Optional p.gravityX / p.gravityY (px/s²) apply a uniform external force,
  // for example from a phone's tilt and shake. Zero or missing means none.
  // Optional p.homing scales the spring toward the glyph (1 = as designed).
+ // Optional p.solo skips all neighbour forces: every particle only follows
+ // its own spring, which is cheap enough for many thousands of particles.
+ // Optional p.drag (1/s) adds damping, e.g. to replace the inner friction
+ // that solo particles lack so they arrive without overshooting.
  step(dt,p,pointer=null){
   dt=Math.max(0,Math.min(1/60,dt));if(!dt)return;this.time+=dt;
   const {n,x,y,vx,vy,ax,ay,tx,ty,free,h,cols,rows,head,next,spacing:s}=this;
   const gx=p.gravityX||0,gy=p.gravityY||0,drip=p.dripGravity||0,homing=p.homing||1;
-  head.fill(-1);
+  const solo=!!p.solo;if(!solo)head.fill(-1);
   const brush=pointer?.down?pointer:null;
   for(let i=0;i<n;i++){
-   const c=Math.max(0,Math.min(cols-1,Math.floor(x[i]/h))),r=Math.max(0,Math.min(rows-1,Math.floor(y[i]/h)));const k=c+r*cols;next[i]=head[k];head[k]=i;
+   if(!solo){const c=Math.max(0,Math.min(cols-1,Math.floor(x[i]/h))),r=Math.max(0,Math.min(rows-1,Math.floor(y[i]/h)));const k=c+r*cols;next[i]=head[k];head[k]=i;}
    const b=brush?Math.max(0,1-Math.hypot(x[i]-brush.x,y[i]-brush.y)/brush.radius):0;
    const homeDistance=Math.hypot(tx[i]-x[i],ty[i]-y[i]);
    const spring=(22+230*Math.exp(-homeDistance*homeDistance/(s*s*12)))*homing*(1-.98*b)*(1-free[i]);ax[i]=(tx[i]-x[i])*spring;ay[i]=(ty[i]-y[i])*spring+drip*free[i];
    if(brush){ax[i]+=(brush.x-x[i])*b*22*p.strength;ay[i]+=(brush.y-y[i])*b*22*p.strength;}
   }
-  for(let i=0;i<n;i++){
+  for(let i=0;i<(solo?0:n);i++){
    const c=Math.floor(x[i]/h),r=Math.floor(y[i]/h);
    for(let ry=Math.max(0,r-1);ry<=Math.min(rows-1,r+1);ry++)for(let cx=Math.max(0,c-1);cx<=Math.min(cols-1,c+1);cx++){
     for(let j=head[cx+ry*cols];j!==-1;j=next[j]){
@@ -60,7 +64,7 @@ export class Fluid {
     }
    }
   }
-  const damping=Math.exp(-(1.05+p.viscosity*3.4)*dt);
+  const damping=Math.exp(-(1.05+p.viscosity*3.4+(p.drag||0))*dt);
   for(let i=0;i<n;i++){
    vx[i]=Math.max(-1600,Math.min(1600,(vx[i]+(ax[i]+gx)*dt)*damping));vy[i]=Math.max(-1600,Math.min(1600,(vy[i]+(ay[i]+gy)*dt)*damping));
    x[i]+=vx[i]*dt;y[i]+=vy[i]*dt;
