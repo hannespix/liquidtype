@@ -1,8 +1,8 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=6b9b86ef';
-import {FluidRenderer} from '../render.mjs?v=6b9b86ef';
-import {sampleGlyphs} from '../glyphs.mjs?v=6b9b86ef';
-import {restrain} from './coupling.mjs?v=6b9b86ef';
+import {Fluid} from '../physics.mjs?v=0057c87d';
+import {FluidRenderer} from '../render.mjs?v=0057c87d';
+import {sampleGlyphs} from '../glyphs.mjs?v=0057c87d';
+import {restrain,sagWeight} from './coupling.mjs?v=0057c87d';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -32,6 +32,10 @@ const defaults={
  shakeGain:650,tiltGain:90,leanGain:120,
  // Flight between initials and headings, and its viscosity.
  morphMs:1000,morphViscosity:.85,
+ // Text grid: invisible strings every gridSpacing letter sizes that the
+ // letters ride; their swing (stiffness, damping) and how hard scrolling
+ // plucks them.
+ gridSpacing:.2,gridStiffness:150,gridDamping:2.2,gridScroll:1.6,
 };
 const tune={...defaults};
 const CALM_SPEED=25,LINE_LOAD_MAX=600,LINE_KICK_MAX=400;
@@ -43,6 +47,7 @@ const darkScheme=matchMedia('(prefers-color-scheme: dark)');
 const isHome=()=>home.classList.contains('is-active');
 function setHint(note){
  hintText.textContent=note||(motion.active?'Antippen öffnet. Ziehen, Neigen oder Schütteln bewegt. Halten lässt platzen.':'Antippen öffnet. Ziehen bewegt. Halten lässt platzen.');
+ scheduleGrid();
 }
 // Paper and ink follow the stylesheet, including its dark scheme.
 function cssColor(name){
@@ -362,7 +367,7 @@ function handOver(fromView,view,focus){
   for(const id of t.timers)clearTimeout(id);
   fromView.hidden=true;fromView.classList.remove('is-active','is-leaving');
   view.classList.remove('is-arriving','is-revealed');canvas.classList.remove('is-fading');canvasOn(false);
-  transition=null;layoutKey='';
+  transition=null;layoutKey='';scheduleGrid();
   if(focus)view.querySelector('h2')?.focus({preventScroll:true});
  }};
  startTransition(t,tune.morphMs+FADE_MS);
@@ -429,7 +434,7 @@ function arriveFrom(shape){
 function show(name,focus=true){
  if(!views.has(name))name='home';
  if(name===current)return;
- transition?.finish();
+ transition?.finish();gridReset();
  const from=current;
  if(canMorph()&&from&&from!=='home'&&name!=='home'&&morphBetween(from,name,focus))return;
  if(canMorph()&&from==='home'&&name!=='home'&&morphForward(name,focus))return;
@@ -445,6 +450,7 @@ function plainShow(name,focus){
   const entry=homeEntry;homeEntry=null;
   requestAnimationFrame(()=>{if(entry)arriveFrom(entry);else{rebuild();scatter();}});
  }
+ scheduleGrid();
  if(focus)(name==='home'?letters[0]:views.get(name).querySelector('h2'))?.focus({preventScroll:true});
 }
 function go(name){
@@ -470,6 +476,7 @@ const TUNE=[
  ['Ruhebewegung','idleDelay','Verzögerung (ms)',1000,15000,100],['Ruhebewegung','idleForce','Kraft',0,4,.1],
  ['Sensoren','shakeGain','Schütteln',0,2000,10],['Sensoren','tiltGain','Kippen',0,300,1],['Sensoren','leanGain','Neigen (Schwerkraft)',0,500,5],
  ['Übergang','morphMs','Flugzeit (ms)',300,2500,50],['Übergang','morphViscosity','Zähigkeit im Flug',0,1,.01],
+ ['Textgitter','gridSpacing','Abstand',.1,.4,.01],['Textgitter','gridStiffness','Schwingung',30,600,5],['Textgitter','gridDamping','Dämpfung',.3,6,.1],['Textgitter','gridScroll','Scrollen',0,4,.1],
 ];
 const physicsDefaults={...parameters};
 const TUNE_KEY='ms-tune';
@@ -510,6 +517,129 @@ function buildTune(){
  window.addEventListener('keydown',e=>{if(e.key==='Escape'&&panel.classList.contains('is-open')){e.stopImmediatePropagation();openTune(false);}},true);
 }
 loadTune();buildTune();
+
+// ------------------------------------------------------------- text grid ---
+// Invisible horizontal strings across the whole page, one every few letter
+// sizes. Every letter is its own span and rides the two strings nearest to
+// it, so when a string swings the text swings with it. Crossing a string
+// with the pointer grabs it; it follows until it snaps free and swings out.
+// Scrolling plucks the strings in view, a tap on empty space plucks the
+// nearest one. Nothing of the grid itself is drawn.
+const SPLIT='.panel, .tagline, .hint';
+const grid={lines:[],letters:[],spacing:70,oy:0,width:0,height:0,raf:0,then:0,timer:0,ptr:{x:NaN,y:NaN},tap:null};
+const gridOn=()=>!reducedMotion.matches;
+function splitText(root){
+ const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),nodes=[];
+ for(let node=walker.nextNode();node;node=walker.nextNode())if(node.data.trim()&&!node.parentElement.closest('.gc, .line'))nodes.push(node);
+ for(const node of nodes){
+  const frag=document.createDocumentFragment();
+  for(const part of node.data.split(/(\s+)/)){
+   if(!part)continue;
+   if(/^\s+$/.test(part)){frag.append(part);continue;}
+   const word=document.createElement('span');word.className='gw';
+   for(const ch of part){const c=document.createElement('span');c.className='gc';c.textContent=ch;word.append(c);}
+   frag.append(word);
+  }
+  node.replaceWith(frag);
+ }
+}
+function gridBuild(){
+ if(!gridOn())return;
+ const root=document.documentElement;
+ grid.spacing=Math.max(44,Math.min(90,Math.round(letterSize*tune.gridSpacing)));
+ grid.width=root.clientWidth;grid.height=Math.max(innerHeight,root.scrollHeight);grid.oy=(innerHeight/2)%grid.spacing;
+ const old=new Map(grid.lines.map(l=>[l.pos,l]));
+ grid.lines=[];
+ for(let y=grid.oy;y<=grid.height;y+=grid.spacing){const keep=old.get(y);grid.lines.push(keep||{pos:y,offset:0,velocity:0,at:.5,grabbed:false});}
+ for(const el of document.querySelectorAll(SPLIT))splitText(el);
+ grid.letters=[];
+ for(const c of document.querySelectorAll('.gc')){
+  c.style.transform='';
+  if(!c.offsetParent)continue;
+  const r=c.getBoundingClientRect();
+  grid.letters.push({el:c,x:r.left+r.width/2+scrollX,y:r.top+scrollY+r.height*.72,dy:0});
+ }
+ gridKick();
+}
+function scheduleGrid(){clearTimeout(grid.timer);grid.timer=setTimeout(gridBuild,80);}
+const lineOffset=(l,x)=>l?sagWeight(grid.width,l.at,x)*l.offset:0;
+function gridLetters(){
+ const {lines,spacing,oy}=grid;
+ for(const L of grid.letters){
+  const fy=(L.y-oy)/spacing,i=Math.floor(fy),k=fy-i;
+  const dy=lineOffset(lines[i],L.x)*(1-k)+lineOffset(lines[i+1],L.x)*k;
+  if(Math.abs(dy-L.dy)>.05){L.dy=dy;L.el.style.transform=dy?`translateY(${dy.toFixed(2)}px)`:'';}
+ }
+}
+function gridTick(t){
+ const dt=grid.then?Math.min(1/30,(t-grid.then)/1000):1/60;grid.then=t;
+ let busy=false;
+ for(const l of grid.lines){
+  if(l.grabbed){busy=true;continue;}
+  if(!l.offset&&!l.velocity)continue;
+  l.velocity+=-tune.gridStiffness*l.offset*dt;l.velocity*=Math.exp(-tune.gridDamping*dt);l.offset+=l.velocity*dt;
+  if(Math.abs(l.offset)<.1&&Math.abs(l.velocity)<2)l.offset=l.velocity=0;else busy=true;
+ }
+ gridLetters();
+ if(busy)grid.raf=requestAnimationFrame(gridTick);else{grid.raf=0;grid.then=0;}
+}
+function gridKick(){if(!grid.raf)grid.raf=requestAnimationFrame(gridTick);}
+const gridSnap=type=>type==='mouse'?grid.spacing*1.4:grid.spacing*1.1;
+function gridPointer(x,y,snap){
+ const px=grid.ptr.x,py=grid.ptr.y;grid.ptr.x=x;grid.ptr.y=y;
+ if(px!==px)return;
+ let touched=false;
+ for(const l of grid.lines){
+  if(!l.grabbed&&(py-l.pos)*(y-l.pos)<=0&&py!==y){l.grabbed=true;l.velocity=0;}
+  if(!l.grabbed)continue;
+  const pull=y-l.pos;l.at=Math.max(0,Math.min(1,x/Math.max(1,grid.width)));
+  if(Math.abs(pull)>snap){gridLet(l);if(snap!==grid.spacing*1.4)try{navigator.vibrate?.(6);}catch{/* optional */}continue;}
+  l.offset=pull;touched=true;
+ }
+ if(touched)gridKick();
+}
+function gridLet(l){l.grabbed=false;if(Math.abs(l.offset)<.75)l.offset=0;gridKick();}
+function gridRelease(){grid.ptr.x=grid.ptr.y=NaN;for(const l of grid.lines)if(l.grabbed)gridLet(l);}
+function gridFlick(l,x,amp){
+ if(!l||l.grabbed||Math.abs(amp)<Math.abs(l.offset)+1)return;
+ l.at=Math.max(0,Math.min(1,x/Math.max(1,grid.width)));l.offset=amp;l.velocity=0;gridKick();
+}
+function gridReset(){
+ for(const l of grid.lines){l.offset=l.velocity=0;l.grabbed=false;}
+ for(const L of grid.letters){L.dy=0;L.el.style.transform='';}
+ grid.ptr.x=grid.ptr.y=NaN;
+}
+if(gridOn()){
+ window.addEventListener('pointermove',e=>{if(e.target?.closest?.('.tune, .tune-toggle, dialog'))return;gridPointer(e.pageX,e.pageY,gridSnap(e.pointerType));},{passive:true});
+ window.addEventListener('pointerdown',e=>{grid.tap=e.pointerType!=='mouse'&&!e.target.closest('button, a, input, .tune')?{x:e.pageX,y:e.pageY,t:performance.now()}:null;},{passive:true});
+ window.addEventListener('pointerup',e=>{
+  if(e.pointerType!=='mouse')gridRelease();
+  // A short tap on empty space plucks the nearest string under the finger.
+  const tap=grid.tap;grid.tap=null;
+  if(tap&&Math.hypot(e.pageX-tap.x,e.pageY-tap.y)<10&&performance.now()-tap.t<350){
+   const l=grid.lines[Math.round((e.pageY-grid.oy)/grid.spacing)];
+   if(l){let pull=e.pageY-l.pos;if(Math.abs(pull)<grid.spacing*.25)pull=grid.spacing*.5*(pull<0?-1:1);gridFlick(l,e.pageX,pull*2.4);}
+  }
+ },{passive:true});
+ window.addEventListener('pointercancel',gridRelease,{passive:true});
+ document.documentElement.addEventListener('pointerleave',gridRelease,{passive:true});
+ // Scrolling: the strings in view lag behind like rubber and the text rides along.
+ let lastScroll=scrollY,lastScrollT=performance.now();
+ window.addEventListener('scroll',()=>{
+  grid.ptr.x=grid.ptr.y=NaN;
+  const now=performance.now(),v=(scrollY-lastScroll)/Math.max(8,now-lastScrollT)*16;lastScroll=scrollY;lastScrollT=now;
+  if(Math.abs(v)<1.5)return;
+  const cap=grid.spacing*1.2,top=scrollY-grid.spacing,bottom=scrollY+innerHeight+grid.spacing;
+  for(const l of grid.lines){
+   if(l.pos<top||l.pos>bottom)continue;
+   const vary=.75+.25*Math.sin(l.pos*.05);
+   gridFlick(l,grid.width*(.5+.3*Math.sin(l.pos*.013)),Math.max(-cap,Math.min(cap,v*tune.gridScroll))*vary);
+  }
+ },{passive:true});
+ window.addEventListener('resize',scheduleGrid,{passive:true});
+ document.fonts?.ready.then(scheduleGrid);
+ scheduleGrid();
+}
 
 // ----------------------------------------------------------------- intro ---
 function closeIntro(){if(intro.open)intro.close();}
