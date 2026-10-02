@@ -74,9 +74,12 @@ class Fluid {
   dx=Math.max(-650,Math.min(650,dx));dy=Math.max(-650,Math.min(650,dy));
   for(let i=0;i<this.n;i++){const d=Math.hypot(this.x[i]-x,this.y[i]-y);if(d<radius){const w=(1-d/radius)**2;this.vx[i]=Math.max(-1500,Math.min(1500,this.vx[i]+dx*w));this.vy[i]=Math.max(-1500,Math.min(1500,this.vy[i]+dy*w));}}
  }
+ // Optional p.gravityX / p.gravityY (px/s²) apply a uniform external force,
+ // for example from a phone's tilt and shake. Zero or missing means none.
  step(dt,p,pointer=null){
   dt=Math.max(0,Math.min(1/60,dt));if(!dt)return;this.time+=dt;
   const {n,x,y,vx,vy,ax,ay,tx,ty,h,cols,rows,head,next,spacing:s}=this;
+  const gx=p.gravityX||0,gy=p.gravityY||0;
   head.fill(-1);
   const brush=pointer?.down?pointer:null;
   for(let i=0;i<n;i++){
@@ -111,7 +114,7 @@ class Fluid {
   }
   const damping=Math.exp(-(1.05+p.viscosity*3.4)*dt);
   for(let i=0;i<n;i++){
-   vx[i]=Math.max(-1600,Math.min(1600,(vx[i]+ax[i]*dt)*damping));vy[i]=Math.max(-1600,Math.min(1600,(vy[i]+ay[i]*dt)*damping));
+   vx[i]=Math.max(-1600,Math.min(1600,(vx[i]+(ax[i]+gx)*dt)*damping));vy[i]=Math.max(-1600,Math.min(1600,(vy[i]+(ay[i]+gy)*dt)*damping));
    x[i]+=vx[i]*dt;y[i]+=vy[i]*dt;
    if(x[i]<s){x[i]=s;vx[i]=Math.abs(vx[i])*.3;}else if(x[i]>this.width-s){x[i]=this.width-s;vx[i]=-Math.abs(vx[i])*.3;}
    if(y[i]<s){y[i]=s;vy[i]=Math.abs(vy[i])*.3;}else if(y[i]>this.height-s){y[i]=this.height-s;vy[i]=-Math.abs(vy[i])*.3;}

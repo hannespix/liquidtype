@@ -28,3 +28,10 @@ test('zero timestep does not move fluid, reset restores it',()=>{
  const f=new Fluid([{x:100,y:80}],800,500,6);f.impulse(100,80,100,50,50);f.step(0,params);assert.equal(f.x[0],100);
  f.step(.01,params);assert.notEqual(f.x[0],100);f.reset();assert.equal(f.x[0],100);assert.equal(f.vx[0],0);
 });
+test('uniform gravity displaces the liquid and it returns once removed',()=>{
+ const f=new Fluid([{x:200,y:200}],800,500,6);
+ for(let i=0;i<300;i++)f.step(1/120,{...params,gravityY:1500});
+ assert.ok(f.y[0]>202,'sags with gravity');assert.equal(f.x[0],200);
+ for(let i=0;i<600;i++)f.step(1/120,params);
+ assert.ok(Math.abs(f.y[0]-200)<.5,'returns without gravity');
+});
