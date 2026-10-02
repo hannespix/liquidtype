@@ -36,20 +36,14 @@ Der Build erzeugt die modularen Website-Dateien in `dist/` und die vollständige
 - `dist/` – fertige modulare Website für statisches Hosting
 - `Liquid-Type-Offline.html` – fertige Offline-Einzeldatei
 
-## Auf GitHub weiterentwickeln
+## Repository und Veröffentlichung
 
-Leeres Repository auf GitHub erstellen. Im entpackten Projektordner:
+- Quellcode: https://github.com/hannespix/liquidtype
+- Live-Version (GitHub Pages): https://hannespix.github.io/liquidtype/ – dort liegt auch die Offline-Datei unter `/Liquid-Type-Offline.html`.
 
-```sh
-git init
-git add .
-git commit -m "Initial import: Liquid Type"
-git branch -M main
-git remote add origin https://github.com/DEIN-NAME/DEIN-REPOSITORY.git
-git push -u origin main
-```
+Jede Änderung geht über einen Pull Request nach `main`. Ein Merge auf `main` startet den GitHub-Actions-Workflow `.github/workflows/pages.yml`, der Tests und Build ausführt und `dist/` samt Offline-Datei auf GitHub Pages veröffentlicht. Pull Requests werden nur getestet und gebaut. Die Arbeitsregeln für die Weiterentwicklung stehen in `CLAUDE.md`.
 
-Das ZIP enthält den vollständigen aktuellen Quellstand einschließlich fertiger Ausgaben, aber keine `.git`-Historie, Zugangsdaten oder Bindung an die ursprünglich gehostete Website. Es ist ein unabhängiges Projekt. Eine Lizenz wurde nicht stellvertretend festgelegt; vor einer Veröffentlichung bei Bedarf eine eigene LICENSE ergänzen.
+Eine Lizenz wurde nicht stellvertretend festgelegt; vor einer breiteren Veröffentlichung bei Bedarf eine eigene LICENSE ergänzen.
 
 ## Technische Grenzen
 
