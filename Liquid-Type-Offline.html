@@ -70,6 +70,12 @@ class Fluid {
   this.head=new Int32Array(this.cols*this.rows);this.next=new Int32Array(this.n);
  }
  reset(){this.x.set(this.tx);this.y.set(this.ty);this.vx.fill(0);this.vy.fill(0);this.time=0;}
+ // Uniform velocity change for the whole liquid, slightly varied over the
+ // glyph so a shake sloshes instead of shifting the letters as one block.
+ nudge(dx,dy){
+  dx=Math.max(-800,Math.min(800,dx));dy=Math.max(-800,Math.min(800,dy));
+  for(let i=0;i<this.n;i++){const k=.75+.25*Math.sin(this.tx[i]*.013+this.ty[i]*.011);this.vx[i]=Math.max(-1500,Math.min(1500,this.vx[i]+dx*k));this.vy[i]=Math.max(-1500,Math.min(1500,this.vy[i]+dy*k));}
+ }
  impulse(x,y,dx,dy,radius){
   dx=Math.max(-650,Math.min(650,dx));dy=Math.max(-650,Math.min(650,dy));
   for(let i=0;i<this.n;i++){const d=Math.hypot(this.x[i]-x,this.y[i]-y);if(d<radius){const w=(1-d/radius)**2;this.vx[i]=Math.max(-1500,Math.min(1500,this.vx[i]+dx*w));this.vy[i]=Math.max(-1500,Math.min(1500,this.vy[i]+dy*w));}}

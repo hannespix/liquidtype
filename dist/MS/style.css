@@ -76,6 +76,7 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .project-meta{font-size:13px;letter-spacing:.08em;text-transform:uppercase;opacity:.55;transition:opacity .2s}
 .project:hover .project-meta,.project:focus-visible .project-meta{opacity:1}
 .address{margin:0 0 1em;font-style:normal;font-size:1.15rem;line-height:1.85}
+.debug{position:fixed;z-index:30;left:1rem;bottom:1rem;margin:0;padding:.5rem .7rem;max-width:calc(100% - 2rem);background:rgba(0,0,0,.8);color:#fff;font:11px/1.5 monospace;white-space:pre-wrap;pointer-events:none}
 .noscript{position:fixed;left:1.25rem;right:1.25rem;bottom:3rem;text-align:center;font-size:14px}
 
 @media(max-width:640px){.initials{font-size:clamp(5.5rem,42vw,9rem)}}

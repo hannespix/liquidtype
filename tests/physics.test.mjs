@@ -35,3 +35,10 @@ test('uniform gravity displaces the liquid and it returns once removed',()=>{
  for(let i=0;i<600;i++)f.step(1/120,params);
  assert.ok(Math.abs(f.y[0]-200)<.5,'returns without gravity');
 });
+test('nudge adds a bounded, slightly varied velocity to every particle',()=>{
+ const f=new Fluid([{x:100,y:100},{x:300,y:260}],800,500,6);
+ f.nudge(200,-50);
+ for(let i=0;i<2;i++){assert.ok(f.vx[i]>=100&&f.vx[i]<=200);assert.ok(f.vy[i]<=-25&&f.vy[i]>=-50);}
+ assert.notEqual(f.vx[0],f.vx[1]);
+ f.nudge(5000,5000);assert.ok(Math.abs(f.vx[0])<=1500&&Math.abs(f.vy[0])<=1500);
+});
