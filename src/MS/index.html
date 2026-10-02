@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matthias Sütterlin — Innenarchitektur und Raumdesign</title>
+<meta name="description" content="Matthias Sütterlin, Innenarchitektur und Raumdesign. Studie mit der Liquid-Type-Engine.">
+<!-- Design study: the original site stays the canonical, indexed address. -->
+<meta name="robots" content="noindex">
+<link rel="canonical" href="https://matthiassuetterlin.github.io/matthiassuetterlin-website/">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23fff'/%3E%3Cpath d='M20 5C18 12 8 20 8 27a12 12 0 0024 0C32 20 22 12 20 5' fill='%23000'/%3E%3C/svg%3E">
+<link rel="preload" href="./fonts/playfair-display-700-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<dialog class="intro" id="intro" aria-labelledby="introTitle">
+ <div class="intro-card">
+  <p class="intro-kicker" id="introTitle">So geht’s</p>
+  <p class="intro-text">Die Buchstaben <strong>M</strong> und <strong>S</strong> sind flüssig. Zieh an ihnen oder tippe sie an, um mehr zu erfahren. Die Wörter darunter führen zu Projekten und Kontakt. Zurück geht es mit <strong>↑ hinaus</strong> oder <strong>Esc</strong>.</p>
+  <form method="dialog"><button class="link" id="introOk" type="submit">Alles klar</button></form>
+ </div>
+</dialog>
+
+<header class="hud">
+ <button class="link" id="back" type="button" hidden>↑ hinaus</button>
+ <p class="crumb" id="crumb" aria-live="polite">Start</p>
+</header>
+
+<main id="views">
+ <section class="view view-home is-active" id="home" data-view="home" aria-label="Start">
+  <canvas class="liquid" id="liquid" aria-hidden="true"></canvas>
+  <div class="home">
+   <h1 class="initials" id="initials" aria-label="Matthias Sütterlin">
+    <button class="initial" type="button" data-go="about" aria-label="M: Über mich öffnen">M</button><button class="initial" type="button" data-go="about" aria-label="S: Über mich öffnen">S</button>
+   </h1>
+   <div class="tagline-wrap">
+    <p class="tagline"><button class="link" type="button" data-go="projects">Innenarchitektur</button><span class="and">und</span><button class="link" type="button" data-go="contact">Raumdesign</button></p>
+    <div data-line></div>
+   </div>
+   <p class="hint">Antippen öffnet. Ziehen bewegt.</p>
+  </div>
+  <p class="credit">Studie mit <a href="../">Liquid Type</a> · <a href="https://matthiassuetterlin.github.io/matthiassuetterlin-website/">Original-Website</a></p>
+ </section>
+
+ <section class="view" id="about" data-view="about" aria-label="Über mich" hidden>
+  <article class="panel">
+   <h2 tabindex="-1">Über mich</h2>
+   <p>Innenarchitekt, Dipl.-Ing. (FH). Als Design Director und Associate Partner bei VAVE entwickle ich räumliche Markenerlebnisse: für Markenauftritte, Handel, Veranstaltungen und Arbeitswelten, mit Basis im Raum Frankfurt / Offenbach.</p>
+   <p>Mein Weg dorthin begann mit einer Tischlerlehre, gefolgt vom Studium der Innenarchitektur an der Hochschule RheinMain. Danach arbeitete ich unter anderem bei innen_architekten BALS+WIRTH und 3deluxe. Bei VAVE bin ich seit vielen Jahren.</p>
+   <dl class="facts">
+    <div><dt>Rolle</dt><dd>Design Director und Associate Partner, VAVE</dd></div>
+    <div><dt>Fokus</dt><dd>Räumliche Markenerlebnisse, Messen und Events</dd></div>
+    <div><dt>Standort</dt><dd>Frankfurt / Offenbach und Ihringen</dd></div>
+   </dl>
+   <nav class="next" aria-label="Weiter"><button class="link" type="button" data-go="projects">Projekte →</button><button class="link" type="button" data-go="contact">Kontakt →</button></nav>
+  </article>
+ </section>
+
+ <section class="view" id="projects" data-view="projects" aria-label="Projekte" hidden>
+  <article class="panel wide">
+   <h2 tabindex="-1">Projekte</h2>
+   <ul class="projects">
+    <li><button class="project" type="button" data-go="fernen"><span class="project-name">ferner.Welten</span><span class="project-meta">2012 · Diplom · Rhônegletscher</span></button></li>
+    <li><button class="project" type="button" data-go="adac"><span class="project-name">ADAC Koblenz</span><span class="project-meta">2014 · Arbeitswelt · BALS+WIRTH</span></button></li>
+    <li><button class="project" type="button" data-go="dreamco"><span class="project-name">DreamCo</span><span class="project-meta">2023–24 · Installation · VAVE</span></button></li>
+   </ul>
+  </article>
+ </section>
+
+ <section class="view" id="fernen" data-view="fernen" aria-label="ferner.Welten" hidden>
+  <article class="panel">
+   <p class="eyebrow">2012 · Diplomarbeit · Rhônegletscher</p>
+   <h2 tabindex="-1">ferner.Welten — Zentrum für Glaziologie</h2>
+   <p>Meine Diplomarbeit: ein Zentrum für Forschung und Besucher direkt am Rhônegletscher im Wallis. Das Gebäude bringt Gletscherforschung, Bildung und Klimabewusstsein an einem Ort zusammen. Der Entwurf wurde international gezeigt, unter anderem bei eVolo.</p>
+   <nav class="next" aria-label="Zurück"><button class="link" type="button" data-go="projects">← Projekte</button></nav>
+  </article>
+ </section>
+
+ <section class="view" id="adac" data-view="adac" aria-label="ADAC Mittelrhein" hidden>
+  <article class="panel">
+   <p class="eyebrow">2014 · Arbeitswelt · BALS+WIRTH</p>
+   <h2 tabindex="-1">ADAC Mittelrhein — Büroflächen Koblenz</h2>
+   <p>Rund 1.320&nbsp;m² Bürofläche auf zwei Etagen für den ADAC Mittelrhein. Das Leitthema Mobilität übersetzt sich in dynamische Linien, die den Raum gliedern. Das Projekt entstand während meiner Zeit bei innen_architekten BALS+WIRTH.</p>
+   <nav class="next" aria-label="Zurück"><button class="link" type="button" data-go="projects">← Projekte</button></nav>
+  </article>
+ </section>
+
+ <section class="view" id="dreamco" data-view="dreamco" aria-label="DreamCo" hidden>
+  <article class="panel">
+   <p class="eyebrow">2023–24 · Installation · VAVE · KI</p>
+   <h2 tabindex="-1">DreamCo — Imagining your dreams</h2>
+   <p>Eine interaktive KI-Installation für die Design Shanghai: Besucherinnen und Besucher beschreiben einen Traum, machen ein Selfie und erhalten daraus ein ganz persönliches Bild. Art Direction bei VAVE, ausgezeichnet unter anderem mit ADCE Bronze.</p>
+   <nav class="next" aria-label="Zurück"><button class="link" type="button" data-go="projects">← Projekte</button></nav>
+  </article>
+ </section>
+
+ <section class="view" id="contact" data-view="contact" aria-label="Kontakt" hidden>
+  <article class="panel">
+   <h2 tabindex="-1">Kontakt</h2>
+   <p>Für Projektanfragen, Kooperationen oder Vorträge freue ich mich über eine E-Mail.</p>
+   <address class="address"><a href="mailto:info@matthiassuetterlin.de">info@matthiassuetterlin.de</a><br>Quellenstraße 3<br>79241 Ihringen</address>
+   <nav class="next" aria-label="Weiter"><button class="link" type="button" data-go="about">← Über mich</button><button class="link" type="button" data-go="projects">Projekte →</button></nav>
+  </article>
+ </section>
+</main>
+<noscript><p class="noscript">Die Bereiche öffnen sich mit JavaScript. Kontakt: <a href="mailto:info@matthiassuetterlin.de">info@matthiassuetterlin.de</a></p></noscript>
+<script type="module" src="./ms.mjs"></script>
+</body>
+</html>

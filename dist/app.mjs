@@ -1,5 +1,6 @@
 import {Fluid} from './physics.mjs';
 import {FluidRenderer} from './render.mjs';
+import {sampleGlyphs} from './glyphs.mjs';
 const $=id=>document.getElementById(id);
 const canvas=$('fluid'),wrap=$('canvasWrap'),input=$('textInput'),cursor=$('cursor');
 // No alternate text layer: the only visible typography is the particle surface.
@@ -23,30 +24,12 @@ function setParameter(name,value){
 controls.forEach(name=>{$(name).addEventListener('input',e=>setParameter(name,e.target.value));setParameter(name,$(name).value);});
 function maskPoints(text,width,height){
  if(!text.trim()){const blank=document.createElement('canvas');blank.width=blank.height=1;renderer?.setMaterial(blank);return{points:[],spacing:5};}
- const c=document.createElement('canvas');c.width=Math.ceil(width);c.height=Math.ceil(height);const ctx=c.getContext('2d',{willReadFrequently:true});
+ const ctx=document.createElement('canvas').getContext('2d');
  let size=Math.min(height*.63,width*.7,330);ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
  const measured=ctx.measureText(text).width;size*=Math.min(1,width*.86/Math.max(1,measured));ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
- const m=ctx.measureText(text);ctx.textAlign='center';ctx.fillStyle='black';ctx.fillText(text,width/2,height/2+(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2);
- // High-resolution glyph coverage is material data for the particles, never a
- // screen-space text image, SVG overlay, opacity layer or alternative renderer.
- const material=document.createElement('canvas');const scale=Math.min(devicePixelRatio||1,2);material.width=Math.ceil(width*scale);material.height=Math.ceil(height*scale);
- const mc=material.getContext('2d');mc.scale(material.width/width,material.height/height);mc.font=ctx.font;mc.textAlign='center';mc.fillStyle='black';mc.fillText(text,width/2,height/2+(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2);renderer?.setMaterial(material);
- const rgba=ctx.getImageData(0,0,c.width,c.height).data;
- let area=0;for(let i=3;i<rgba.length;i+=4)area+=rgba[i]/255;
- const budget=width<700?2200:4200;let spacing=Math.max(2.5,Math.sqrt(area/(budget*.8)));
- let points=[];
- // Keep a complete lattice cell for every ink intersection, including fine serifs.
- for(let attempt=0;attempt<3;attempt++){
-  points=[];
-  for(let y=0;y<height;y+=spacing)for(let x=0;x<width;x+=spacing){
-   let ink=false;
-   for(let yy=Math.floor(y);yy<Math.min(height,y+spacing)&&!ink;yy++)for(let xx=Math.floor(x);xx<Math.min(width,x+spacing);xx++){
-    if(rgba[(yy*c.width+xx)*4+3]>0){ink=true;break;}
-   }
-   if(ink)points.push({x:x+spacing*.5,y:y+spacing*.5});
-  }
-  if(points.length<=budget)break;spacing*=Math.sqrt(points.length/budget)*1.03;
- }
+ const m=ctx.measureText(text),font=ctx.font,baseline=height/2+(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2;
+ const {points,spacing,material}=sampleGlyphs(width,height,g=>{g.font=font;g.textAlign='center';g.fillStyle='black';g.fillText(text,width/2,baseline);},width<700?2200:4200);
+ renderer?.setMaterial(material);
  return {points,spacing};
 }
 function setText(value,animate=true){

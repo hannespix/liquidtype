@@ -39,6 +39,8 @@ precision highp float;
 in vec2 uv;
 uniform sampler2D density;
 uniform vec2 texel;
+uniform vec3 paper;
+uniform vec3 ink;
 out vec4 color;
 void main(){
  vec3 sums=texture(density,uv).rgb;
@@ -50,11 +52,13 @@ void main(){
  v*=smoothstep(.006,.024,coverage);
  float aa=max(fwidth(v)*.65,.012);
  float body=smoothstep(.51-aa,.51+aa,v);
- color=vec4(mix(vec3(.973,.973,.957),vec3(.016,.020,.019),body),1.);
+ color=vec4(mix(paper,ink,body),1.);
 
 }`;
 export class FluidRenderer {
- constructor(canvas){
+ // Colours are linear 0..1 RGB triples; the defaults match the main Liquid Type page.
+ constructor(canvas,{paper=[.973,.973,.957],ink=[.016,.020,.019]}={}){
+  this.paper=paper;this.ink=ink;
   const gl=canvas.getContext('webgl2',{alpha:false,antialias:false,powerPreference:'high-performance',depth:false,stencil:false});
   if(!gl)throw new Error('WebGL2 ist auf diesem Gerät nicht verfügbar.');
   this.gl=gl;this.canvas=canvas;this.floatSurface=!!gl.getExtension('EXT_color_buffer_float');
@@ -95,7 +99,7 @@ export class FluidRenderer {
   gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.uniform1i(gl.getUniformLocation(this.points,'glyphMaterial'),1);gl.uniform2f(gl.getUniformLocation(this.points,'pixelScale'),this.canvas.width/this.w,this.canvas.height/this.h);gl.uniform1f(gl.getUniformLocation(this.points,'radius'),fluid.spacing*2.1);
   gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE);gl.drawArrays(gl.POINTS,0,fluid.n);gl.disable(gl.BLEND);
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.useProgram(this.surface);gl.bindVertexArray(null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.texture);
-  gl.uniform1i(gl.getUniformLocation(this.surface,'density'),0);gl.uniform2f(gl.getUniformLocation(this.surface,'texel'),1/this.canvas.width,1/this.canvas.height);gl.drawArrays(gl.TRIANGLES,0,3);
+  gl.uniform1i(gl.getUniformLocation(this.surface,'density'),0);gl.uniform2f(gl.getUniformLocation(this.surface,'texel'),1/this.canvas.width,1/this.canvas.height);gl.uniform3fv(gl.getUniformLocation(this.surface,'paper'),this.paper);gl.uniform3fv(gl.getUniformLocation(this.surface,'ink'),this.ink);gl.drawArrays(gl.TRIANGLES,0,3);
  }
 }
 
