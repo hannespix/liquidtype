@@ -1,0 +1,29 @@
+# Liquid Type – Hinweise für Claude Code
+
+## Projekt
+
+Statische Browseranwendung: Schrift als 2D-Flüssigkeit mit WebGL2-Rendering. Keine npm-Pakete, kein `npm install`; Node.js 22 oder neuer genügt.
+
+- `npm test` – Physik-, Gleichgewichts- und Buildtests (`node --test`)
+- `npm run build` – erzeugt `dist/` und `Liquid-Type-Offline.html` aus `src/`
+- `npm run dev` – lokaler Entwicklungsserver auf http://127.0.0.1:5173
+
+Änderungen immer in `src/` vornehmen. `dist/` und `Liquid-Type-Offline.html` sind eingecheckt und werden ausschließlich vom Build erzeugt: nach jeder Quelländerung `npm run build` ausführen und die erzeugten Dateien im selben Commit mitführen. Die CI bricht ab, wenn sie nicht zum Quellstand passen.
+
+Keine neuen Laufzeitabhängigkeiten einführen. Oberfläche, Dokumentation und Commit-Texte auf Deutsch; Code-Kommentare dürfen Englisch bleiben.
+
+## Fester Arbeitsablauf (von Hannes festgelegt am 02.10.2026)
+
+Nach **jeder** Änderung automatisch und ohne Rückfrage:
+
+1. Arbeitsbranch von `origin/main` anlegen oder darauf neu aufsetzen (`claude/<thema>`). Niemals direkt auf `main` committen.
+2. Vor dem Push lokal `npm test` und `npm run build` ausführen. Nur grün pushen.
+3. Pull Request gegen `main` öffnen (kein Draft) und sofort mergen (Squash-Merge).
+4. Der Merge auf `main` startet den Workflow `.github/workflows/pages.yml`: Tests, Build und Deployment auf GitHub Pages. Den Lauf abwarten und prüfen. Schlägt er fehl, sofort nachbessern: neuer Branch, PR, Merge.
+5. Zum Abschluss die Live-URL nennen: https://hannespix.github.io/liquidtype/
+
+Jede Änderung bekommt einen eigenen PR, auch kleine. Erzeugte Dateien gehören in denselben PR wie die Quelländerung.
+
+## Deployment
+
+GitHub Pages wird ausschließlich über GitHub Actions bereitgestellt (Repository-Einstellungen → Pages → Quelle „GitHub Actions“). Der Workflow veröffentlicht den Inhalt von `dist/` und zusätzlich die Offline-Einzeldatei unter `/Liquid-Type-Offline.html`. Pull Requests führen nur Tests und Build aus, kein Deployment.

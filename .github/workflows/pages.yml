@@ -1,0 +1,71 @@
+# Liquid Type: Tests, Build und Veröffentlichung auf GitHub Pages.
+# Pull Requests werden nur getestet und gebaut. Jeder Push auf main
+# (in der Regel ein PR-Merge) veröffentlicht dist/ plus Offline-Datei.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test und Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quellcode auschecken
+        uses: actions/checkout@v5
+
+      - name: Node.js 22 einrichten
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Erzeugte Dateien müssen zum Quellstand passen
+        run: git diff --exit-code -- dist Liquid-Type-Offline.html
+
+      - name: Seite zusammenstellen
+        run: |
+          mkdir -p _site
+          cp -R dist/. _site/
+          cp Liquid-Type-Offline.html _site/
+
+      - name: Pages-Artefakt hochladen
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: GitHub Pages veröffentlichen
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Pages konfigurieren
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Veröffentlichen
+        id: deployment
+        uses: actions/deploy-pages@v4
