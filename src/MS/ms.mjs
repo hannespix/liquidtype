@@ -490,7 +490,8 @@ let current=null,transition=null,homeEntry=null;
 function viewFromHash(){const name=decodeURIComponent(location.hash.slice(1));return views.has(name)?name:'home';}
 function chrome(name){
  const label=views.get(name).getAttribute('aria-label');
- back.hidden=name==='home';crumb.textContent=label;
+ // The home page names nothing in the corner; sections show where one is.
+ back.hidden=name==='home';crumb.textContent=name==='home'?'':label;
  document.title=name==='home'?baseTitle:`${label} — Matthias Sütterlin`;
 }
 const canMorph=()=>!!renderer&&!reducedMotion.matches&&!home.classList.contains('no-liquid');
