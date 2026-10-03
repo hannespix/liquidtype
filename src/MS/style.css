@@ -74,8 +74,6 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .line path{fill:none;stroke:var(--ink);stroke-width:1}
 .line-hit{position:absolute;z-index:1;left:0;top:-18px;height:36px;touch-action:none}
 .line.is-gliding svg{visibility:hidden}
-/* The pointer's liquid drop (cursor.mjs): above the text, never in the way */
-.cursor-drop{position:fixed;z-index:5;left:0;top:0;pointer-events:none}
 /* The line that glides between two pages' lines while the page changes */
 .glide-line{position:fixed;z-index:3;left:0;top:0;height:400px;overflow:visible;pointer-events:none}
 .glide-line path{fill:none;stroke:var(--ink);stroke-width:1}

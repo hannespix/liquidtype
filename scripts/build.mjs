@@ -2,7 +2,7 @@ import {readFile,writeFile,mkdir,copyFile,cp,rm,readdir} from 'node:fs/promises'
 import {createHash} from 'node:crypto';
 import path from 'node:path';
 // Main page modules, in dependency order for the inlined offline file.
-const modules=['physics.mjs','render.mjs','glyphs.mjs','quality.mjs','app.mjs'];
+const modules=['physics.mjs','render.mjs','glyphs.mjs','quality.mjs','sensors.mjs','cursor.mjs','effects.mjs','app.mjs'];
 const files=['index.html','404.html','style.css',...modules];
 // Subpages are static folders that import the shared engine modules from ../
 const folders=['MS'];

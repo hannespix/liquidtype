@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Upright,screenDirection,quarter,quarterToDown} from '../src/MS/sensors.mjs';
+import {Upright,MotionReader,screenDirection,quarter,quarterToDown} from '../src/sensors.mjs';
 
 // A phone held upright (portrait, slightly leaning back) in the spec's frame,
 // and the change of the reading when its right edge tips down.
@@ -54,4 +54,27 @@ test('quarter turns',()=>{
  assert.deepEqual(quarter({x:1,y:2},4),{x:1,y:2});
  assert.equal(quarterToDown({x:-3,y:0}),3);
  assert.equal(quarterToDown({x:0,y:-3}),2);
+});
+
+test('the motion reader turns a shake into a push opposite to it, once aligned',()=>{
+ const r=new MotionReader({wait:1500}),gains={shake:650,tilt:90,lean:120};
+ // An upright phone by the spec (gravity reads +9.8 "up" the screen), still.
+ const still=t=>r.read({accelerationIncludingGravity:{x:0,y:9.8,z:0},acceleration:{x:0,y:0,z:0}},t,0,gains);
+ assert.equal(r.read({accelerationIncludingGravity:{x:null,y:null}},0,0,gains),null,'unusable reading');
+ assert.equal(still(0).first,true);
+ let last;for(let t=16;t<=200;t+=16)last=still(t);
+ assert.equal(last.aligned,true,'ten steady upright readings teach the alignment');
+ assert.ok(Math.abs(last.nudge.x)<1e-9&&Math.abs(last.nudge.y)<1e-9,'holding still pushes nothing');
+ // A shake to the right (+x) sends the liquid left.
+ const shake=r.read({accelerationIncludingGravity:{x:6,y:9.8,z:0},acceleration:{x:6,y:0,z:0}},216,0,gains);
+ assert.ok(shake.nudge.x<-10,`push ${shake.nudge.x}`);
+ assert.ok(Math.abs(shake.nudge.x)<=260,'limited');
+});
+
+test('without alignment the reader moves nothing until the wait is over',()=>{
+ const r=new MotionReader({wait:1500}),gains={shake:650,tilt:90,lean:120};
+ // Flat on a table: too little tilt to learn from.
+ const flat=t=>r.read({accelerationIncludingGravity:{x:0,y:0,z:9.8},acceleration:{x:0,y:0,z:0}},t,0,gains);
+ flat(0);assert.equal(flat(500).aligned,false);assert.equal(flat(1600).aligned,true);
+ r.relearn();assert.equal(flat(1700).aligned,false,'learned anew after the screen turned');
 });

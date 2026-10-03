@@ -5,8 +5,9 @@ import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from 
 import {matchPoints} from './match.mjs';
 import {restrain,sagWeight} from './coupling.mjs';
 import {createQuality} from '../quality.mjs';
-import {Upright} from './sensors.mjs';
-import {DropChain,DropOutline} from './cursor.mjs';
+import {MotionReader} from '../sensors.mjs';
+import {LiquidCursor} from '../cursor.mjs';
+import {scatterAround,burstFrom,isCalm,dripIndices,Settle,idleHand} from '../effects.mjs';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),back=$('back'),crumb=$('crumb'),hint=$('hint'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -93,16 +94,10 @@ const CALM_SPEED=25,LINE_LOAD_MAX=600,LINE_KICK_MAX=400;
 let renderer=null,fluid=null,w=0,h=0,last=0,accumulator=0,layoutKey='',rebuildTimer=0;
 let idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null,homeLine=null,lineLoad=0,lineKick=0;
 let holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+tune.dripMin,liquidArea=null,magnetOn=false,letterSize=200;
-// A settling phase blends extra parameters in for a moment and fades them
-// out toward the end, e.g. thin flow while the letters assemble or a
-// stronger pull home after a burst, without a jolt when it ends.
-const settle={until:0,duration:0,extra:null};
-function settleFor(ms,extra){settle.until=performance.now()+ms;settle.duration=ms;settle.extra=extra;}
-function settling(t){
- const k=Math.min(1,(settle.until-t)/Math.max(1,settle.duration)*1.6);
- const out={...parameters};for(const key in settle.extra)out[key]=parameters[key]===undefined?1+(settle.extra[key]-1)*k:parameters[key]+(settle.extra[key]-parameters[key])*k;
- return out;
-}
+// A settling phase (see effects.mjs): thin flow while the letters assemble
+// or a stronger pull home after a burst, fading out without a jolt.
+const settle=new Settle();
+function settleFor(ms,extra){settle.start(performance.now(),ms,extra);}
 const magnet={x:0,y:0,down:true,radius:0};
 const darkScheme=matchMedia('(prefers-color-scheme: dark)');
 const isHome=()=>home.classList.contains('is-active');
@@ -194,41 +189,29 @@ const clampY=v=>Math.max(fluid.spacing,Math.min(h-fluid.spacing,v));
 // The letters condense from scattered drops instead of simply appearing.
 function scatter(){
  if(!fluid||reducedMotion.matches)return;
- const r=Math.min(w,h)*tune.assembleSpread;
- for(let i=0;i<fluid.n;i++){
-  const a=Math.random()*Math.PI*2,d=r*Math.sqrt(Math.random());
-  fluid.x[i]=clampX(fluid.tx[i]+Math.cos(a)*d);fluid.y[i]=clampY(fluid.ty[i]+Math.sin(a)*d);fluid.vx[i]=fluid.vy[i]=0;
- }
+ scatterAround(fluid,Math.min(w,h)*tune.assembleSpread);
  idleSince=performance.now();settleFor(tune.assembleMs,{viscosity:.3,attraction:.5,homing:2});
 }
 // Everything flies away from the press point; the spring lets go for a moment.
 function burst(x,y){
  if(!fluid)return;
- const R=Math.max(w,h),now=performance.now();
- for(let i=0;i<fluid.n;i++){
-  const dx=fluid.x[i]-x,dy=fluid.y[i]-y,d=Math.hypot(dx,dy)||1,f=1-d/R;
-  if(f<=0)continue;
-  const speed=tune.burstSpeed*Math.sqrt(f)*(.8+.4*Math.random());
-  fluid.vx[i]=Math.max(-1500,Math.min(1500,fluid.vx[i]+dx/d*speed));fluid.vy[i]=Math.max(-1500,Math.min(1500,fluid.vy[i]+dy/d*speed));
- }
+ const now=performance.now();
+ burstFrom(fluid,x,y,tune.burstSpeed);
  if(!reducedMotion.matches){fluid.free.fill(1);burstUntil=now+tune.burstFreeMs;drip=null;}
  pointer.down=false;pointer.dragged=true;suppressClickUntil=now+600;idleSince=now;
  settleFor(tune.burstFreeMs+2600,{homing:2.5});
  try{navigator.vibrate?.(20);}catch{/* optional */}
 }
-function calm(){let sum=0,count=0;for(let i=0;i<fluid.n;i+=37){sum+=Math.hypot(fluid.vx[i],fluid.vy[i]);count++;}return count===0||sum/count<CALM_SPEED;}
 function startDrip(t){
- let lowest=0;for(let i=0;i<fluid.n;i++)if(fluid.ty[i]>lowest)lowest=fluid.ty[i];
- const bottom=[];for(let i=0;i<fluid.n;i++)if(fluid.ty[i]>=lowest-fluid.spacing*2.5)bottom.push(i);
- if(!bottom.length)return;
- const seed=bottom[Math.floor(Math.random()*bottom.length)],sx=fluid.tx[seed],sy=fluid.ty[seed],r=fluid.spacing*tune.dripSize;
- const indices=[];for(let i=0;i<fluid.n;i++)if(Math.hypot(fluid.tx[i]-sx,fluid.ty[i]-sy)<r){indices.push(i);fluid.free[i]=1;}
+ const indices=dripIndices(fluid,tune.dripSize);
+ if(!indices.length)return;
+ for(const i of indices)fluid.free[i]=1;
  drip={indices,until:t+tune.dripFallMs};
 }
 function effects(t){
  if(burstUntil&&t>burstUntil){fluid.free.fill(0);burstUntil=0;}
  if(drip){if(t>drip.until){for(const i of drip.indices)fluid.free[i]=0;drip=null;nextDrip=t+tune.dripMin+Math.random()*Math.max(0,tune.dripMax-tune.dripMin);}}
- else if(t>nextDrip){if(!reducedMotion.matches&&!pointer.down&&!burstUntil&&calm())startDrip(t);else nextDrip=t+800;}
+ else if(t>nextDrip){if(!reducedMotion.matches&&!pointer.down&&!burstUntil&&isCalm(fluid,CALM_SPEED))startDrip(t);else nextDrip=t+800;}
 }
 function scheduleRebuild(){clearTimeout(rebuildTimer);rebuildTimer=setTimeout(()=>rebuild(),120);}
 // 0 during a flight, rising smoothly to 1 between calmFrom and calmTo.
@@ -246,7 +229,7 @@ function draw(){
  // Toward the end of a flight the liquid settles into crisp type on cue.
  renderer.calm=flightCalm();
  // The pointer's drop melting into the letters is drawn with the liquid.
- renderer.extra=isHome()&&!transition?cursorSolid:null;
+ renderer.extra=isHome()&&!transition?liquidCursor.solid:null;
  renderer.draw(fluid);
 }
 function local(e){const r=canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
@@ -294,8 +277,7 @@ initials.addEventListener('keydown',e=>{
 // After a quiet moment an invisible hand drifts around the initials.
 function idleMotion(t){
  if(reducedMotion.matches||pointer.down||!centre||t-idleSince<tune.idleDelay){ghost=null;return;}
- const s=(t-idleSince-tune.idleDelay)/1000;
- const x=centre.x+Math.cos(s*.45)*centre.rx,y=centre.y+Math.sin(s*.7)*centre.ry;
+ const {x,y}=idleHand(centre,(t-idleSince-tune.idleDelay)/1000);
  if(ghost)disturb(x,y,(x-ghost.x)*tune.idleForce*parameters.strength,(y-ghost.y)*tune.idleForce*parameters.strength,pointer.radius*.6);
  ghost={x,y};
 }
@@ -329,71 +311,55 @@ function frame(t){
   const line=shape&&{top:shape.top-box.top,width:shape.width,anchor:shape.anchor,offset:shape.offset,rate:shape.rate,shift:box.left};
   magnet.radius=letterSize*tune.magnetRadius;
   const brush=pointer.down?pointer:magnetOn&&!reducedMotion.matches?magnet:null;
-  const prm=brush===magnet?{...parameters,strength:tune.magnetStrength}:t<settle.until?settling(t):parameters;
+  const prm=brush===magnet?{...parameters,strength:tune.magnetStrength}:settle.params(parameters,t);
   while(accumulator>=1/120){
    fluid.step(1/120,prm,brush);
    if(line){const hit=restrain(fluid,line);lineLoad=hit.load;lineKick+=Math.min(LINE_KICK_MAX,hit.impact*tune.lineImpactGain);}
    accumulator-=1/120;
   }
  }
- cursorSync(t);
+ liquidCursor.sync(t);
  draw();
  quality?.frame(interval,performance.now()-work);
 }
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();renderer=null;fluid=null;home.classList.add('no-liquid');});
 canvas.addEventListener('webglcontextrestored',()=>{createRenderer();rebuild(true);});
-darkScheme.addEventListener('change',()=>{const c=colors();renderer?.setColors(c.paper,c.ink);cursorInk=c.ink;draw();cursorKick();});
+darkScheme.addEventListener('change',()=>{const c=colors();renderer?.setColors(c.paper,c.ink);liquidCursor.ink=c.ink;draw();liquidCursor.kick();});
 new ResizeObserver(scheduleRebuild).observe(document.getElementById('views'));
 new ResizeObserver(scheduleRebuild).observe(initials);
 document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;release({pointerId:pointer.id});resetMotion();quality?.reset();});
 
 // ----------------------------------------------------------------- motion ---
-// Phone sensors. Only changes count: a shake or a quick tilt sends the liquid
-// off; holding the phone still in any position does nothing lasting. Device
-// acceleration (m/s²) becomes liquid velocity (px/s): tune.shakeGain
-// integrates linear acceleration (px per metre), tune.tiltGain scales the
-// change of the gravity direction per event, tune.leanGain is a faint force
-// toward the tilt that relaxes within LEAN_RELAX seconds.
-const LEAN_RELAX=2,NUDGE_LIMIT=260,SENSOR_TIMEOUT=300,SENSOR_WAIT=2500;
-const motion={active:false,gravity:null,pose:null,last:0,events:0,waiting:0,since:0};
-// Sensor axes differ between devices and browsers (see sensors.mjs): the
-// phone's own resting readings tell which way is down on the screen. Learned
-// anew whenever the screen turns.
-const upright=new Upright(),UPRIGHT_WAIT=1500;
+// Phone sensors (see MotionReader in sensors.mjs). Only changes count: a
+// shake or a quick tilt sends the liquid off; holding the phone still in any
+// position does nothing lasting. tune.shakeGain integrates linear
+// acceleration (px per metre), tune.tiltGain scales the change of the
+// gravity direction per event, tune.leanGain is a faint force toward the
+// tilt that relaxes within two seconds. The sensor axes differ between
+// devices and browsers; the reader learns which way is down from the phone's
+// own resting readings, anew whenever the screen turns.
+const SENSOR_TIMEOUT=300,SENSOR_WAIT=2500;
+const motion={active:false,events:0,waiting:0,reader:new MotionReader()};
 const screenAngle=()=>screen.orientation?.angle??window.orientation??0;
-const relearnUpright=()=>{upright.forget();motion.since=0;};
+const relearnUpright=()=>motion.reader.relearn();
 screen.orientation?.addEventListener?.('change',relearnUpright);window.addEventListener('orientationchange',relearnUpright);
 const debug=new URLSearchParams(location.search).has('debug')?Object.assign(document.body.appendChild(document.createElement('pre')),{className:'debug'}):null;
 // With ?debug the running simulation is reachable from the console for tuning.
-if(debug)window.liquidType={get fluid(){return fluid;},get drip(){return drip;},get parameters(){return parameters;},get motion(){return motion;},get renderer(){return renderer;},get transition(){return transition;},get quality(){return quality;},get cursor(){return chain;}};
-// Device reading to the direction the liquid moves on the canvas (x right,
-// y down): opposite to the device's own acceleration, aligned with the screen.
-const liquidDirection=(x,y)=>upright.direction(x,y,screenAngle());
-const clampNudge=v=>Math.max(-NUDGE_LIMIT,Math.min(NUDGE_LIMIT,v));
+if(debug)window.liquidType={get fluid(){return fluid;},get drip(){return drip;},get parameters(){return parameters;},get motion(){return motion;},get renderer(){return renderer;},get transition(){return transition;},get quality(){return quality;},get cursor(){return liquidCursor.chain;}};
 function onMotion(e){
- const g=e.accelerationIncludingGravity;
- if(!g||g.x==null||g.y==null)return;
- const now=performance.now(),dt=motion.last?Math.min(.1,(now-motion.last)/1000):0;motion.last=now;motion.events++;
+ const now=performance.now(),r=motion.reader.read(e,now,screenAngle(),{shake:tune.shakeGain,tilt:tune.tiltGain,lean:tune.leanGain});
+ if(!r)return;
+ motion.events++;
  if(!motion.active){motion.active=true;clearTimeout(motion.waiting);motionButton.hidden=true;setHint();}
- // Until the alignment is known the readings move nothing; a phone lying flat
- // keeps the standard alignment after a moment.
- if(!motion.since)motion.since=now;
- upright.add(g.x,g.y,screenAngle());
- const aligned=upright.turn!==null||now-motion.since>UPRIGHT_WAIT;
- if(!motion.gravity){motion.gravity={x:g.x,y:g.y};motion.pose={x:g.x,y:g.y};return;}
- const before={x:motion.gravity.x,y:motion.gravity.y},fast=1-Math.exp(-dt*10),slow=1-Math.exp(-dt/LEAN_RELAX);
- motion.gravity.x+=(g.x-before.x)*fast;motion.gravity.y+=(g.y-before.y)*fast;
- motion.pose.x+=(motion.gravity.x-motion.pose.x)*slow;motion.pose.y+=(motion.gravity.y-motion.pose.y)*slow;
- const a=e.acceleration,ax=a&&a.x!=null?a.x:g.x-motion.gravity.x,ay=a&&a.y!=null?a.y:g.y-motion.gravity.y;
- const shake=liquidDirection(ax,ay),turn=liquidDirection(motion.gravity.x-before.x,motion.gravity.y-before.y),lean=liquidDirection(motion.gravity.x-motion.pose.x,motion.gravity.y-motion.pose.y);
- const dx=clampNudge(shake.x*tune.shakeGain*dt+turn.x*tune.tiltGain),dy=clampNudge(shake.y*tune.shakeGain*dt+turn.y*tune.tiltGain);
+ if(r.first)return;
+ const {aligned,nudge:{x:dx,y:dy},lean,linear:{x:ax,y:ay},g}=r,turn=motion.reader.upright.turn;
  if(aligned&&fluid&&isHome()&&!document.hidden&&Math.hypot(dx,dy)>1.5){fluid.nudge(dx,dy);idleSince=now;}
- parameters.gravityX=aligned?lean.x*tune.leanGain:0;parameters.gravityY=aligned?lean.y*tune.leanGain:0;
- if(debug)debug.textContent=`sensor aktiv · ${motion.events} ereignisse · ausrichtung ${upright.turn===null?(aligned?'standard':'lernt'):upright.turn*90+'°'} · bildschirm ${screenAngle()}°\na ${ax.toFixed(2)} ${ay.toFixed(2)}  g ${g.x.toFixed(2)} ${g.y.toFixed(2)} ${(g.z??0).toFixed(2)}\nschub ${dx.toFixed(0)} ${dy.toFixed(0)} px/s  lehnen ${parameters.gravityX.toFixed(0)} ${parameters.gravityY.toFixed(0)}`;
+ parameters.gravityX=aligned?lean.x:0;parameters.gravityY=aligned?lean.y:0;
+ if(debug)debug.textContent=`sensor aktiv · ${motion.events} ereignisse · ausrichtung ${turn===null?(aligned?'standard':'lernt'):turn*90+'°'} · bildschirm ${screenAngle()}°\na ${ax.toFixed(2)} ${ay.toFixed(2)}  g ${g.x.toFixed(2)} ${g.y.toFixed(2)} ${(g.z??0).toFixed(2)}\nschub ${dx.toFixed(0)} ${dy.toFixed(0)} px/s  lehnen ${parameters.gravityX.toFixed(0)} ${parameters.gravityY.toFixed(0)}`;
 }
 // Without fresh sensor data the lean must not linger.
-function settleMotion(t){if(motion.last&&t-motion.last>SENSOR_TIMEOUT)parameters.gravityX=parameters.gravityY=0;}
-function resetMotion(){parameters.gravityX=parameters.gravityY=0;motion.gravity=null;motion.last=0;}
+function settleMotion(t){if(motion.reader.last&&t-motion.reader.last>SENSOR_TIMEOUT)parameters.gravityX=parameters.gravityY=0;}
+function resetMotion(){parameters.gravityX=parameters.gravityY=0;motion.reader.reset();}
 function startMotion(){
  window.removeEventListener('devicemotion',onMotion);window.addEventListener('devicemotion',onMotion,{passive:true});
  if(debug&&!motion.active)debug.textContent='sensor angefragt, warte auf ereignisse …';
@@ -424,59 +390,15 @@ if(motionPossible){
 // ink drawn with the liquid itself, so it truly flows together with M and S.
 // On the home page the liquid's own frame drives it, so the drop follows the
 // liquid wherever it is (dragged, burst, dripping); on the text pages it runs
-// on its own and sleeps while the pointer rests.
+// on its own and sleeps while the pointer rests. A finger covers small
+// drops: on touch screens they stay bigger.
 const coarsePointer=matchMedia('(pointer: coarse)').matches;
-const chain=new DropChain(),cursorCanvas=document.createElement('canvas');
-let cursorOutline=null,cursorRaf=0,cursorThen=0,cursorSolid=[],cursorInk=colors().ink;
-try{cursorCanvas.className='cursor-drop';cursorCanvas.setAttribute('aria-hidden','true');cursorOutline=new DropOutline(cursorCanvas);document.body.append(cursorCanvas);}catch{cursorOutline=null;}
-function cursorFit(){if(cursorOutline){const w=document.documentElement.clientWidth,h=innerHeight;cursorCanvas.style.width=w+'px';cursorCanvas.style.height=h+'px';cursorOutline.resize(w,h,Math.min(2,devicePixelRatio||1));}}
-function cursorTick(t){
- cursorRaf=0;
- const dt=cursorThen?Math.min(.1,(t-cursorThen)/1000):1/60;cursorThen=t;
- Object.assign(chain.o,{count:tune.cursorDrops,follow:tune.cursorFollow,wobble:tune.cursorWobble,rest:tune.cursorRest,decay:tune.cursorDecay,taper:tune.cursorTaper,reach:tune.meltReach,overlap:tune.meltOverlap,meltIn:tune.meltIn,meltOut:tune.meltOut});
- // A finger covers small drops: on touch screens they stay bigger.
- const R=Math.max(coarsePointer?34:18,letterSize*tune.cursorSize);
- // Nearest drop of the liquid as it is right now, in viewport px, and the
- // distance to its surface (half a lattice step outside the drop's centre);
- // only while the letters are on show. A few thousand drops are cheap to
- // scan, and the drop then melts into the letters wherever they flow.
- const liquid=cursorTarget(),box=liquid?canvas.getBoundingClientRect():null;
- const near=liquid?(x,y)=>{
-  const cx=x-box.left,cy=y-box.top,{x:px,y:py,n}=liquid;let best=-1,least=Infinity;
-  for(let i=0;i<n;i++){const dx=px[i]-cx,dy=py[i]-cy,d2=dx*dx+dy*dy;if(d2<least){least=d2;best=i;}}
-  return best<0?null:{d:Math.max(0,Math.sqrt(least)-liquid.spacing*.5),x:px[best]+box.left,y:py[best]+box.top};
- }:null;
- const alive=chain.advance(dt,near,R),{outline,solid,scale}=chain.shape(R,tune.meltBridge);
- cursorOutline.draw(outline,R*scale*tune.cursorMerge,tune.cursorLine,cursorInk);
- cursorSolid=box?solid.map(d=>({x:d.x-box.left,y:d.y-box.top,r:d.r})):[];
- if(alive)cursorRaf=requestAnimationFrame(cursorTick);
- else{cursorThen=0;if(!chain.ptr.on){cursorOutline.clear();cursorSolid=[];}}
-}
-// The liquid the drop may melt into: only while the letters are on show.
-function cursorTarget(){return isHome()&&!transition&&fluid?.n?fluid:null;}
-// Called by the liquid's frame right before it draws: steps the drop in the
-// same frame, so the part melting into the letters moves with them and shows
-// together with its outline, as long as the drop is there at all.
-function cursorSync(t){
- if(!cursorOutline||reducedMotion.matches)return;
- if(cursorRaf){cancelAnimationFrame(cursorRaf);cursorTick(t);}
- else if(cursorTarget()&&(chain.ptr.on||chain.presence>.01))cursorTick(t);
-}
-function cursorKick(){if(cursorOutline&&!reducedMotion.matches&&!cursorRaf)cursorRaf=requestAnimationFrame(cursorTick);}
-function cursorAt(x,y){chain.point(x,y);cursorKick();}
-function cursorAway(){chain.leave();cursorKick();}
-if(cursorOutline){
- // A new canvas size clears the outline, so it is drawn again.
- cursorFit();window.addEventListener('resize',()=>{cursorFit();cursorKick();},{passive:true});
- window.addEventListener('pointermove',e=>cursorAt(e.clientX,e.clientY),{passive:true});
- window.addEventListener('pointerdown',e=>cursorAt(e.clientX,e.clientY),{passive:true});
- document.documentElement.addEventListener('pointerleave',cursorAway,{passive:true});
- window.addEventListener('blur',cursorAway,{passive:true});
- // While the page scrolls under a finger, pointer events stop but touch events go on.
- window.addEventListener('touchmove',e=>{const t=e.touches[0];if(t)cursorAt(t.clientX,t.clientY);},{passive:true});
- const touchEnd=e=>{if(!e.touches.length)cursorAway();};
- window.addEventListener('touchend',touchEnd,{passive:true});window.addEventListener('touchcancel',touchEnd,{passive:true});
-}
+const liquidCursor=new LiquidCursor({
+ liquid:()=>isHome()&&!transition&&fluid?.n?{fluid,canvas}:null,
+ radius:()=>Math.max(coarsePointer?34:18,letterSize*tune.cursorSize),
+ options:()=>({count:tune.cursorDrops,follow:tune.cursorFollow,wobble:tune.cursorWobble,rest:tune.cursorRest,decay:tune.cursorDecay,taper:tune.cursorTaper,reach:tune.meltReach,overlap:tune.meltOverlap,meltIn:tune.meltIn,meltOut:tune.meltOut,merge:tune.cursorMerge,line:tune.cursorLine,bridge:tune.meltBridge}),
+ ink:colors().ink,reduced:reducedMotion,
+});
 
 // ------------------------------------------------------------ navigation ---
 const views=new Map([...document.querySelectorAll('.view')].map(v=>[v.dataset.view,v]));
@@ -763,7 +685,7 @@ function buildTune(){
   const out=document.createElement('output');
   const input=document.createElement('input');input.type='range';input.min=String(min);input.max=String(max);input.step=String(step);
   const show=()=>{const v=(target||tune)[key];input.value=String(v);input.style.setProperty('--fill',((v-min)/(max-min)*100).toFixed(1)+'%');out.value=step<1?v.toFixed(step<.01?3:2):String(Math.round(v));};
-  input.addEventListener('input',()=>{(target||tune)[key]=Number(input.value);show();saveTune();values.value=JSON.stringify(tuneValues());cursorKick();});
+  input.addEventListener('input',()=>{(target||tune)[key]=Number(input.value);show();saveTune();values.value=JSON.stringify(tuneValues());liquidCursor.kick();});
   row.append(name,out,input);body.append(row);inputs.push(show);show();
  }
  const refresh=()=>{for(const show of inputs)show();values.value=JSON.stringify(tuneValues());};

@@ -5,7 +5,7 @@
 <meta name="theme-color" content="#f8f8f4"><meta name="description" content="Schrift, die sich wie Flüssigkeit verhält. Verändere den Text, ziehe an der Oberfläche und experimentiere mit der Physik.">
 <title>Liquid Type — Schrift in Bewegung</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23f8f8f4'/%3E%3Cpath d='M20 5C18 12 8 20 8 27a12 12 0 0024 0C32 20 22 12 20 5' fill='%23090b0a'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="./style.css?v=d7a59191">
+<link rel="stylesheet" href="./style.css?v=e80c5703">
 </head>
 <body>
 <header class="topbar">
@@ -43,10 +43,23 @@
    </div>
   </div>
   <div class="actions"><button id="pause" type="button" aria-pressed="false"><span id="pauseIcon" aria-hidden="true">Ⅱ</span><span id="pauseLabel">Pause</span></button><button id="reset" type="button"><span aria-hidden="true">↺</span> Zurücksetzen</button></div>
+  <div class="effects" role="group" aria-labelledby="effectsLabel">
+   <div class="section-label"><span id="effectsLabel">03 / DIE EFFEKTE</span><span>EINZELN AN- UND AUSSCHALTEN</span></div>
+   <div class="effect-list">
+    <button class="effect" type="button" data-effect="cursor" aria-pressed="true"><i aria-hidden="true"></i>Tropfen am Zeiger</button>
+    <button class="effect" type="button" data-effect="magnet" aria-pressed="true"><i aria-hidden="true"></i>Magnet</button>
+    <button class="effect" type="button" data-effect="burst" aria-pressed="true"><i aria-hidden="true"></i>Halten lässt platzen</button>
+    <button class="effect" type="button" data-effect="drips" aria-pressed="true"><i aria-hidden="true"></i>Tropfen fallen</button>
+    <button class="effect" type="button" data-effect="idle" aria-pressed="true"><i aria-hidden="true"></i>Unsichtbare Hand</button>
+    <button class="effect" type="button" data-effect="assemble" aria-pressed="true"><i aria-hidden="true"></i>Zusammensetzen</button>
+    <button class="effect" type="button" data-effect="motion" aria-pressed="false" hidden><i aria-hidden="true"></i>Bewegungssensor</button>
+   </div>
+   <p class="effect-note" id="effectNote" role="status" hidden></p>
+  </div>
  </section>
  <footer class="bottom"><span>TYPE IS NO LONGER STILL.</span><p>Eine spielerische 2D-Flüssigkeitssimulation.<br>Mit Kohäsion, Trägheit und einem Gedächtnis für Buchstaben.</p><span class="footer-mark" aria-hidden="true">lt.</span></footer>
 </main>
 <noscript>Bitte aktiviere JavaScript, um die interaktive Schrift auszuprobieren.</noscript>
-<script type="module" src="./app.mjs?v=d7a59191"></script>
+<script type="module" src="./app.mjs?v=e80c5703"></script>
 </body>
 </html>

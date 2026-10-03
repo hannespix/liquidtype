@@ -1,6 +1,6 @@
 # Liquid Type
 
-Interaktive schwarze Flüssigkeitsschrift mit editierbarem Text, Maus-/Touch-Interaktion, Scrollimpulsen und vier Physikreglern. Stand: 02.10.2026, letzte überarbeitete Offline-Version mit glatt überlappenden Partikeln.
+Interaktive schwarze Flüssigkeitsschrift mit editierbarem Text, Maus-/Touch-Interaktion, Scrollimpulsen, vier Physikreglern und den Effekten der MS-Seite. Stand: 02.10.2026, letzte überarbeitete Offline-Version mit glatt überlappenden Partikeln.
 
 ## Direkt ausprobieren
 
@@ -27,11 +27,14 @@ Der Build erzeugt die modularen Website-Dateien in `dist/` und die vollständige
 
 - `src/index.html` – Oberfläche und Bedienelemente
 - `src/style.css` – responsives Layout
-- `src/app.mjs` – Eingaben, Animation und optionale WebMCP-Anbindung der Hauptseite
+- `src/app.mjs` – Eingaben, Animation, Effekte und optionale WebMCP-Anbindung der Hauptseite
 - `src/glyphs.mjs` – gemeinsame Abtastung von Schrift in Partikel und Materialtextur
 - `src/physics.mjs` – Partikelphysik und Gleichgewicht an der Schriftform
 - `src/render.mjs` – WebGL2-Oberflächenrekonstruktion mit einstellbaren Farben
 - `src/quality.mjs` – automatische Qualitätsstufen für schwache und ältere Geräte
+- `src/effects.mjs` – gemeinsame Effekte: Zusammensetzen, Platzen, Tropfen, Einschwingen, unsichtbare Hand
+- `src/cursor.mjs` – flüssiger Mauszeiger, der mit der Schrift verschmilzt
+- `src/sensors.mjs` – Bewegungssensoren: Ausrichtung je Gerät und was die Flüssigkeit davon spürt
 - `src/MS/` – Unterseite für Matthias Sütterlin mit flüssigen Initialen M und S
 - `src/404.html` – Fehlerseite, leitet `/ms/` in beliebiger Schreibweise auf `/MS/` um
 - `scripts/` – Build und lokaler Entwicklungsserver ohne Abhängigkeiten
@@ -39,6 +42,20 @@ Der Build erzeugt die modularen Website-Dateien in `dist/` und die vollständige
 - `docs/` – Architektur, Prüfstand und ursprünglicher Entwurf
 - `dist/` – fertige modulare Website für statisches Hosting
 - `Liquid-Type-Offline.html` – fertige Offline-Einzeldatei
+
+## Effekte auf der Hauptseite
+
+Der Generator hat dieselben Effekte wie die MS-Seite, mit deren abgestimmten Werten. Unter den Physikreglern lässt sich jeder einzeln ein- und ausschalten („03 / Die Effekte“):
+
+- **Tropfen am Zeiger** – über der Bühne zieht der Zeiger einen flüssigen Tropfen hinter sich her, der nahe der Schrift mit ihr verschmilzt. Er ersetzt dann den gezeichneten DRAG-Ring.
+- **Magnet** – eine Maus über der Schrift zieht die Flüssigkeit zu sich (nur mit Maus sichtbar).
+- **Halten lässt platzen** – gedrückt halten sammelt die Flüssigkeit am Zeiger und lässt sie platzen; sie findet von selbst wieder zusammen.
+- **Tropfen fallen** – alle paar ruhigen Sekunden löst sich ein Tropfen vom unteren Rand und wird zurückgezogen.
+- **Unsichtbare Hand** – nach einigen Sekunden Ruhe bewegt sie die Oberfläche sanft.
+- **Zusammensetzen** – beim Laden und beim Zurücksetzen bildet sich die Schrift aus verstreuten Tropfen.
+- **Bewegungssensor** – am Smartphone schwappt die Schrift beim Schütteln und schnellen Kippen. Android liefert die Daten sofort, iOS fragt beim Einschalten nach Erlaubnis.
+
+Bei reduzierter Bewegung (Systemeinstellung) ruht die Animation wie bisher. Die WebMCP-Anbindung kann die Effekte ebenfalls schalten; den Bewegungssensor nur aus, weil iOS zum Einschalten ein Antippen verlangt.
 
 ## Schwache und ältere Geräte
 

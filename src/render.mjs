@@ -1,4 +1,4 @@
-const vertex=`#version 300 es
+const pointVertex=`#version 300 es
 precision highp float;
 in vec2 position;
 in vec2 home;
@@ -27,7 +27,7 @@ void main(){
  dropRadius=size*2.1*grow;amplitude=mix(1.,fineAmp,f*moving);
  gl_Position=vec4(position/resolution*vec2(2.,-2.)+vec2(-1.,1.),0.,1.);gl_PointSize=min(maxPoint,size*pointScale*grow);
 }`;
-const drop=`#version 300 es
+const dropFragment=`#version 300 es
 precision highp float;
 uniform sampler2D glyphMaterial;
 uniform vec2 resolution;
@@ -53,11 +53,11 @@ void main(){
  color=vec4(kernel*mix(ink,1.,shape),kernel,kernel*shape,0.);
 
 }`;
-const screen=`#version 300 es
+const screenVertex=`#version 300 es
 precision highp float;
 out vec2 uv;
 void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));uv=p;gl_Position=vec4(p*2.-1.,0.,1.);}`;
-const surface=`#version 300 es
+const surfaceFragment=`#version 300 es
 precision highp float;
 in vec2 uv;
 uniform sampler2D density;
@@ -93,7 +93,7 @@ export class FluidRenderer {
   const gl=canvas.getContext('webgl2',{alpha:false,antialias:false,powerPreference:'high-performance',depth:false,stencil:false});
   if(!gl)throw new Error('WebGL2 ist auf diesem Gerät nicht verfügbar.');
   this.gl=gl;this.canvas=canvas;this.floatSurface=!!gl.getExtension('EXT_color_buffer_float');
-  this.points=this.program(vertex,drop);this.surface=this.program(screen,surface);
+  this.points=this.program(pointVertex,dropFragment);this.surface=this.program(screenVertex,surfaceFragment);
   // Uniform locations are looked up once instead of on every frame.
   const where=(program,names)=>Object.fromEntries(names.map(n=>[n,gl.getUniformLocation(program,n)]));
   this.at=where(this.points,['resolution','pointScale','maxPoint','glyphMaterial','pixelScale','shrink','fine','fineAmp']);

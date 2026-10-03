@@ -2,11 +2,13 @@
 // the pointer and is drawn as one smooth outline. It swells while the
 // pointer moves and slowly shrinks when it rests. Near the liquid letters a
 // drop melts into them: its outline draws in while a solid drop of the same
-// size grows inside the liquid, with two smaller drops bridging to the
-// nearest point of a letter. Moving away reverses it.
+// size grows inside the liquid, with a neck of smaller drops reaching the
+// nearest point of the liquid. Moving away reverses it. Shared by the
+// Liquid Type pages.
 //
 // DropChain holds the motion (pure, testable); DropOutline draws the outline
-// with one WebGL shader on a transparent canvas.
+// with one WebGL shader on a transparent canvas; LiquidCursor puts both on a
+// page and lets the drop melt into its liquid.
 
 const smooth=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
 
@@ -158,5 +160,74 @@ export class DropOutline{
   gl.uniform3fv(at.drops,this.data);gl.uniform1i(at.count,list.length);
   gl.uniform1f(at.merge,Math.max(.01,merge));gl.uniform1f(at.width,width);gl.uniform3fv(at.ink,ink);
   gl.drawArrays(gl.TRIANGLES,0,3);this.shown=true;
+ }
+}
+
+// The drop on a page: its own transparent canvas over the viewport, pointer
+// and touch input, and melting into a liquid. `liquid()` returns
+// {fluid, canvas} while the drop may melt into that fluid (else null),
+// `radius()` the largest drop radius in px and `options()` the DropChain
+// dials plus merge (outline smoothness, × radius), line (px) and bridge.
+// Without `host` the drop follows the pointer over the whole page, with it
+// only over that element. A page whose liquid runs its own frame calls
+// sync() right before drawing, so the drop moves with the liquid and its
+// melting part (`solid`, canvas px, for the renderer's `extra`) shows in
+// the same frame as its outline; otherwise the drop runs on its own and
+// sleeps while the pointer rests. Under reduced motion there is no drop.
+export class LiquidCursor{
+ constructor({liquid,radius,options,ink=[0,0,0],host=null,reduced=null}){
+  Object.assign(this,{liquid,radius,options,ink,reduced});
+  this.chain=new DropChain();this.solid=[];this.raf=0;this.then=0;this.on=true;this.outline=null;
+  this.canvas=document.createElement('canvas');this.canvas.setAttribute('aria-hidden','true');
+  this.canvas.style.cssText='position:fixed;z-index:5;left:0;top:0;pointer-events:none';
+  try{this.outline=new DropOutline(this.canvas);document.body.append(this.canvas);}catch{this.outline=null;return;}
+  this.tick=this.tick.bind(this);
+  // A new canvas size clears the outline, so it is drawn again.
+  this.fit();addEventListener('resize',()=>{this.fit();this.kick();},{passive:true});
+  const target=host||window,at=e=>this.at(e.clientX,e.clientY),away=()=>this.away();
+  target.addEventListener('pointermove',at,{passive:true});target.addEventListener('pointerdown',at,{passive:true});
+  (host||document.documentElement).addEventListener('pointerleave',away,{passive:true});addEventListener('blur',away,{passive:true});
+  // While the page scrolls under a finger, pointer events stop but touch events go on.
+  target.addEventListener('touchmove',e=>{const t=e.touches[0];if(t)this.at(t.clientX,t.clientY);},{passive:true});
+  const end=e=>{if(!e.touches.length)this.away();};
+  target.addEventListener('touchend',end,{passive:true});target.addEventListener('touchcancel',end,{passive:true});
+ }
+ get ready(){return !!this.outline&&this.on&&!this.reduced?.matches;}
+ fit(){if(this.outline){const w=document.documentElement.clientWidth,h=innerHeight;this.canvas.style.width=w+'px';this.canvas.style.height=h+'px';this.outline.resize(w,h,Math.min(2,devicePixelRatio||1));}}
+ at(x,y){if(this.ready){this.chain.point(x,y);this.kick();}}
+ away(){if(this.ready){this.chain.leave();this.kick();}}
+ kick(){if(this.ready&&!this.raf)this.raf=requestAnimationFrame(this.tick);}
+ // Switching the drop off removes it at once; on again, it appears with the next move.
+ set enabled(v){
+  this.on=!!v;if(this.on||!this.outline)return;
+  cancelAnimationFrame(this.raf);this.raf=0;this.then=0;this.outline.clear();this.solid=[];
+  this.chain.leave();this.chain.presence=0;this.chain.drops=[];
+ }
+ get enabled(){return this.on;}
+ tick(t){
+  this.raf=0;
+  const dt=this.then?Math.min(.1,(t-this.then)/1000):1/60;this.then=t;
+  const o=this.options(),R=this.radius();Object.assign(this.chain.o,o);
+  // Nearest drop of the liquid as it is right now, in viewport px, and the
+  // distance to its surface (half a lattice step outside the drop's centre).
+  // A few thousand drops are cheap to scan, and the drop then melts into the
+  // letters wherever they flow.
+  const target=this.liquid(),fluid=target?.fluid?.n?target.fluid:null,box=fluid?target.canvas.getBoundingClientRect():null;
+  const near=fluid?(x,y)=>{
+   const cx=x-box.left,cy=y-box.top,{x:px,y:py,n}=fluid;let best=-1,least=Infinity;
+   for(let i=0;i<n;i++){const dx=px[i]-cx,dy=py[i]-cy,d2=dx*dx+dy*dy;if(d2<least){least=d2;best=i;}}
+   return best<0?null:{d:Math.max(0,Math.sqrt(least)-fluid.spacing*.5),x:px[best]+box.left,y:py[best]+box.top};
+  }:null;
+  const alive=this.chain.advance(dt,near,R),{outline,solid,scale}=this.chain.shape(R,o.bridge);
+  this.outline.draw(outline,R*scale*o.merge,o.line,this.ink);
+  this.solid=box?solid.map(d=>({x:d.x-box.left,y:d.y-box.top,r:d.r})):[];
+  if(alive)this.raf=requestAnimationFrame(this.tick);
+  else{this.then=0;if(!this.chain.ptr.on){this.outline.clear();this.solid=[];}}
+ }
+ // Called by the liquid's frame right before it draws.
+ sync(t){
+  if(!this.ready)return;
+  if(this.raf){cancelAnimationFrame(this.raf);this.tick(t);}
+  else if(this.liquid()&&(this.chain.ptr.on||this.chain.presence>.01))this.tick(t);
  }
 }
