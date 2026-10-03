@@ -16,7 +16,7 @@ const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 // The sweet spot: heavy and cohesive, but still alive. Viscosity below
 // honey so waves, drips and bursts settle within a couple of seconds.
 const parameters={viscosity:.55,tension:.7,attraction:.85,strength:1.8,gravityX:0,gravityY:0,dripGravity:1400};
-const pointer={x:0,y:0,down:false,radius:80,id:null,last:0,startX:0,startY:0,dragged:false};
+const pointer={x:0,y:0,down:false,radius:80,id:null,last:0,startX:0,startY:0,dragged:false,burst:false,cx:0,cy:0};
 // Every effect's dials. Adjustable live from the tuning panel (bottom left)
 // and remembered in this browser; `defaults` restores them.
 const defaults={
@@ -198,7 +198,8 @@ function burst(x,y){
  const now=performance.now();
  burstFrom(fluid,x,y,tune.burstSpeed);
  if(!reducedMotion.matches){fluid.free.fill(1);burstUntil=now+tune.burstFreeMs;drip=null;}
- pointer.down=false;pointer.dragged=true;suppressClickUntil=now+600;idleSince=now;
+ // The liquid flies free, but the press goes on (see pressAgain).
+ pointer.down=false;pointer.dragged=true;pointer.burst=true;pointer.startX=pointer.cx;pointer.startY=pointer.cy;suppressClickUntil=now+600;idleSince=now;
  settleFor(tune.burstFreeMs+2600,{homing:2.5});
  try{navigator.vibrate?.(20);}catch{/* optional */}
 }
@@ -210,8 +211,10 @@ function startDrip(t){
 }
 function effects(t){
  if(burstUntil&&t>burstUntil){fluid.free.fill(0);burstUntil=0;}
+ // Still holding after a burst: once the letters are back, the press counts anew.
+ if(pointer.burst&&pointer.id!==null&&!pointer.down&&t>settle.until)pressAgain(false);
  if(drip){if(t>drip.until){for(const i of drip.indices)fluid.free[i]=0;drip=null;nextDrip=t+tune.dripMin+Math.random()*Math.max(0,tune.dripMax-tune.dripMin);}}
- else if(t>nextDrip){if(!reducedMotion.matches&&!pointer.down&&!burstUntil&&isCalm(fluid,CALM_SPEED))startDrip(t);else nextDrip=t+800;}
+ else if(t>nextDrip){if(!reducedMotion.matches&&pointer.id===null&&!burstUntil&&isCalm(fluid,CALM_SPEED))startDrip(t);else nextDrip=t+800;}
 }
 function scheduleRebuild(){clearTimeout(rebuildTimer);rebuildTimer=setTimeout(()=>rebuild(),120);}
 // 0 during a flight, rising smoothly to 1 between calmFrom and calmTo.
@@ -238,15 +241,26 @@ function disturb(x,y,dx,dy,radius){if(fluid&&Math.abs(dx)+Math.abs(dy)>=.1)fluid
 home.addEventListener('pointerdown',e=>{
  if(!fluid||transition||pointer.id!==null||e.button>0||e.target.closest('a, .link, .line-hit, .motion-pill'))return;
  const p=local(e);
- Object.assign(pointer,{x:p.x,y:p.y,startX:e.clientX,startY:e.clientY,down:true,id:e.pointerId,last:performance.now(),dragged:false});
+ Object.assign(pointer,{x:p.x,y:p.y,cx:e.clientX,cy:e.clientY,id:e.pointerId,last:performance.now(),burst:false});
  idleSince=performance.now();magnetOn=false;
- clearTimeout(holdTimer);holdTimer=setTimeout(()=>{if(pointer.down&&!pointer.dragged)burst(pointer.x,pointer.y);},tune.holdMs);
+ pressAgain(false);
 });
+// A press holds the liquid under the pointer; held still for holdMs, it
+// bursts. After a burst the finger may stay down: moving it drags the
+// liquid again at once (`dragging`), and holding still until the letters
+// are back starts a fresh press, so holding on bursts them again.
+function pressAgain(dragging){
+ Object.assign(pointer,{down:true,dragged:dragging,startX:pointer.cx,startY:pointer.cy});
+ clearTimeout(holdTimer);
+ if(!dragging)holdTimer=setTimeout(()=>{if(pointer.down&&!pointer.dragged)burst(pointer.x,pointer.y);},tune.holdMs);
+}
 home.addEventListener('contextmenu',e=>{if(e.target.closest('.initial, .liquid'))e.preventDefault();});
 window.addEventListener('pointermove',e=>{
  if(!fluid||!isHome()||transition||(pointer.id!==null&&e.pointerId!==pointer.id)||(!pointer.down&&e.target?.closest?.('.tune, .tune-toggle')))return;
- if(pointer.down&&e.pointerType==='mouse'&&e.buttons===0)release(e);
+ if(pointer.id!==null&&e.pointerType==='mouse'&&e.buttons===0)release(e);
  const p=local(e),now=performance.now();
+ if(pointer.id!==null){pointer.cx=e.clientX;pointer.cy=e.clientY;}
+ if(pointer.burst&&pointer.id!==null&&!pointer.down&&Math.hypot(e.clientX-pointer.startX,e.clientY-pointer.startY)>8)pressAgain(true);
  if(pointer.last){
   const dx=p.x-pointer.x,dy=p.y-pointer.y;
   if(pointer.down)disturb(p.x,p.y,dx*16*parameters.strength,dy*16*parameters.strength,pointer.radius);
@@ -259,9 +273,9 @@ window.addEventListener('pointermove',e=>{
 },{passive:true});
 function release(e){
  if(pointer.id===null||(e&&e.pointerId!==pointer.id))return;
- // A drag that ends on a letter must not also open "Über mich".
- if(pointer.dragged)suppressClickUntil=Math.max(suppressClickUntil,performance.now()+400);
- clearTimeout(holdTimer);pointer.down=false;pointer.id=null;pointer.dragged=false;
+ // A drag or a burst that ends on a letter must not also open "Über mich".
+ if(pointer.dragged||pointer.burst)suppressClickUntil=Math.max(suppressClickUntil,performance.now()+400);
+ clearTimeout(holdTimer);pointer.down=false;pointer.id=null;pointer.dragged=false;pointer.burst=false;
 }
 window.addEventListener('pointerup',release);
 window.addEventListener('pointercancel',release);

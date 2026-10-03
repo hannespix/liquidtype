@@ -905,7 +905,7 @@ const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 const controls=['viscosity','tension','attraction','strength'];
 const parameters={viscosity:.35,tension:.65,attraction:.5,strength:1.3,gravityX:0,gravityY:0,dripGravity:1400};
 let renderer=null,fluid=null,paused=reduced.matches,failed=false,w=0,h=0,last=0,accumulator=0,textTimer,resizeTimer,quality=null;
-const pointer={x:-1000,y:-1000,down:false,radius:95,id:null,last:0,startX:0,startY:0,dragged:false};
+const pointer={x:-1000,y:-1000,down:false,radius:95,id:null,last:0,startX:0,startY:0,dragged:false,burst:false,cx:0,cy:0};
 // The effects of the MS page, each switchable in the controls. Their dials
 // are the MS page's tuned values (see `defaults` in src/MS/ms.mjs): idle hand,
 // letters condensing from a cloud, hold to burst, drips from the lowest
@@ -1006,7 +1006,9 @@ function move(e){
   if(pointer.down)disturb(x,y,dx*16*parameters.strength,dy*16*parameters.strength,pointer.radius);
   else if(e.pointerType==='mouse'&&Math.hypot(dx,dy)<100)disturb(x,y,dx*2.5*parameters.strength,dy*2.5*parameters.strength,pointer.radius*.65);
  }
- // A press that moves is a drag, not a hold.
+ // A press that moves is a drag, not a hold; after a burst, moving drags again.
+ if(pointer.id!==null){pointer.cx=e.clientX;pointer.cy=e.clientY;}
+ if(pointer.burst&&pointer.id!==null&&!pointer.down&&!paused&&Math.hypot(e.clientX-pointer.startX,e.clientY-pointer.startY)>8)pressAgain(true);
  if(pointer.down&&!pointer.dragged&&Math.hypot(e.clientX-pointer.startX,e.clientY-pointer.startY)>8){pointer.dragged=true;clearTimeout(holdTimer);}
  magnetOn=effects.magnet&&!pointer.down&&e.pointerType==='mouse'&&!!liquidArea&&x>liquidArea.left&&x<liquidArea.right&&y>liquidArea.top&&y<liquidArea.bottom;
  magnet.x=x;magnet.y=y;
@@ -1016,14 +1018,21 @@ function move(e){
 }
 canvas.addEventListener('pointerdown',e=>{
  if(pointer.id!==null||failed)return;
- move(e);Object.assign(pointer,{id:e.pointerId,down:!paused,startX:e.clientX,startY:e.clientY,dragged:false});magnetOn=false;
- canvas.setPointerCapture(e.pointerId);cursor.classList.toggle('dragging',pointer.down);
- // Holding still gathers the liquid under the pointer, then it bursts.
- clearTimeout(holdTimer);
- if(pointer.down&&effects.burst)holdTimer=setTimeout(()=>{if(pointer.down&&!pointer.dragged)burstAt(pointer.x,pointer.y);},FX.holdMs);
+ move(e);Object.assign(pointer,{id:e.pointerId,cx:e.clientX,cy:e.clientY,burst:false});magnetOn=false;
+ canvas.setPointerCapture(e.pointerId);
+ if(paused){pointer.down=false;pointer.dragged=false;}else pressAgain(false);
 });
+// A press holds the liquid under the pointer; held still, it bursts. After a
+// burst the finger may stay down: moving it drags the liquid again at once
+// (`dragging`), and holding still until the letters are back starts a fresh
+// press, so holding on bursts them again.
+function pressAgain(dragging){
+ Object.assign(pointer,{down:true,dragged:dragging,startX:pointer.cx,startY:pointer.cy});cursor.classList.add('dragging');
+ clearTimeout(holdTimer);
+ if(!dragging&&effects.burst)holdTimer=setTimeout(()=>{if(pointer.down&&!pointer.dragged)burstAt(pointer.x,pointer.y);},FX.holdMs);
+}
 canvas.addEventListener('pointermove',e=>{if(pointer.id!==null&&e.pointerId!==pointer.id)return;move(e);});
-function release(e){if(pointer.id!==null&&e.pointerId!==pointer.id)return;clearTimeout(holdTimer);pointer.down=false;pointer.id=null;pointer.dragged=false;cursor.classList.remove('dragging');}
+function release(e){if(pointer.id!==null&&e.pointerId!==pointer.id)return;clearTimeout(holdTimer);pointer.down=false;pointer.id=null;pointer.dragged=false;pointer.burst=false;cursor.classList.remove('dragging');}
 canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('lostpointercapture',release);
 canvas.addEventListener('pointerleave',()=>{cursor.style.display='none';magnetOn=false;if(!pointer.down)pointer.last=0;});
 canvas.addEventListener('keydown',e=>{
@@ -1085,7 +1094,8 @@ function burstAt(x,y){
  const now=performance.now();
  burstFrom(fluid,x,y,FX.burstSpeed);
  if(!reduced.matches){fluid.free.fill(1);burstUntil=now+FX.burstFreeMs;drip=null;}
- pointer.down=false;pointer.dragged=true;cursor.classList.remove('dragging');idleSince=now;
+ // The liquid flies free, but the press goes on (see pressAgain).
+ pointer.down=false;pointer.dragged=true;pointer.burst=true;pointer.startX=pointer.cx;pointer.startY=pointer.cy;cursor.classList.remove('dragging');idleSince=now;
  settle.start(now,FX.burstFreeMs+2600,{homing:2.5});
  try{navigator.vibrate?.(20);}catch{/* optional */}
 }
@@ -1093,9 +1103,11 @@ function burstAt(x,y){
 // is pulled back; the springs of a burst catch again after a moment.
 function dripsAndBursts(t){
  if(burstUntil&&t>burstUntil){fluid.free.fill(0);burstUntil=0;}
+ // Still holding after a burst: once the letters are back, the press counts anew.
+ if(pointer.burst&&pointer.id!==null&&!pointer.down&&t>settle.until)pressAgain(false);
  if(drip){if(t>drip.until){for(const i of drip.indices)fluid.free[i]=0;drip=null;nextDrip=t+FX.dripMin+Math.random()*(FX.dripMax-FX.dripMin);}}
  else if(t>nextDrip){
-  if(effects.drips&&!reduced.matches&&!pointer.down&&!burstUntil&&isCalm(fluid)){
+  if(effects.drips&&!reduced.matches&&pointer.id===null&&!burstUntil&&isCalm(fluid)){
    const indices=dripIndices(fluid,FX.dripSize);
    for(const i of indices)fluid.free[i]=1;
    drip=indices.length?{indices,until:t+FX.dripFallMs}:null;
