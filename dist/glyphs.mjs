@@ -33,30 +33,43 @@ export function strokeWidth(rgba,stride,rows){
  for(let y=0;y<rows;y++)for(let x=0;x<stride;x++){
   const k=(y*stride+x)*4+3,a=rgba[k]/255;area+=a;
   const right=x+1<stride?rgba[k+4]/255:0,below=y+1<rows?rgba[k+stride*4]/255:0;
-  edge+=Math.hypot(right-a,below-a);
+  const ex=right-a,ey=below-a;edge+=Math.sqrt(ex*ex+ey*ey);
  }
  return edge>0?2*area/edge:0;
 }
-// Particles on a fixed lattice, optionally only inside `box` {x0,y0,x1,y1}.
-// `spacing` is a number or a function of the ink's stroke width, so the
-// lattice can follow the weight of the type. With `faithful`, a lattice no
-// coarser than the strokes takes cells by their centre, so the particles
-// carry the type's own weight (every stroke still crosses a cell centre).
-// Returns the points, the spacing used and the stroke width. One scratch
-// canvas is reused; only the box is cleared and read back.
+// Ink painted by `draw`, read back only inside `box` {x0,y0,x1,y1} (or the
+// whole area). One scratch canvas is reused; only the box is cleared. The
+// result can be scanned at several spacings without painting again; its
+// stroke width is measured once, when first asked for.
 let latticeCanvas=null;
-export function glyphLattice(width,height,draw,spacing,{box=null,threshold=0,faithful=false}={}){
+export function glyphRaster(width,height,draw,{box=null}={}){
  const cw=Math.ceil(width),ch=Math.ceil(height);
- if(!latticeCanvas||latticeCanvas.width<cw||latticeCanvas.height<ch){latticeCanvas=document.createElement('canvas');latticeCanvas.width=cw;latticeCanvas.height=ch;}
- const ctx=latticeCanvas.getContext('2d',{willReadFrequently:true});
  const x0=Math.max(0,Math.floor(box?box.x0:0)),y0=Math.max(0,Math.floor(box?box.y0:0));
  const x1=Math.min(width,Math.ceil(box?box.x1:width)),y1=Math.min(height,Math.ceil(box?box.y1:height));
- if(x1<=x0||y1<=y0)return {points:[],spacing:typeof spacing==='number'?spacing:0,stroke:0};
+ if(x1<=x0||y1<=y0)return {rgba:null,x0,y0,x1:x0,y1:y0,stroke:0};
+ if(!latticeCanvas||latticeCanvas.width<cw||latticeCanvas.height<ch){latticeCanvas=document.createElement('canvas');latticeCanvas.width=cw;latticeCanvas.height=ch;}
+ const ctx=latticeCanvas.getContext('2d',{willReadFrequently:true});
  ctx.clearRect(x0,y0,x1-x0,y1-y0);ctx.save();draw(ctx);ctx.restore();
  const rgba=ctx.getImageData(x0,y0,x1-x0,y1-y0).data;
- const stroke=typeof spacing==='number'&&!faithful?0:strokeWidth(rgba,x1-x0,y1-y0);
+ let stroke=null;
+ return {rgba,x0,y0,x1,y1,get stroke(){return stroke??=strokeWidth(rgba,x1-x0,y1-y0);}};
+}
+// Particles on a fixed lattice over a raster. `spacing` is a number or a
+// function of the ink's stroke width, so the lattice can follow the weight of
+// the type. With `faithful`, a lattice no coarser than the strokes takes
+// cells by their centre, so the particles carry the type's own weight (every
+// stroke still crosses a cell centre). Returns the points, the spacing used
+// and the stroke width.
+export function rasterLattice(raster,spacing,{threshold=0,faithful=false}={}){
+ const {rgba,x0,y0,x1,y1}=raster;
+ const stroke=typeof spacing==='number'&&!faithful?0:raster.stroke;
  const s=typeof spacing==='number'?spacing:spacing(stroke);
+ if(!rgba)return {points:[],spacing:s,stroke};
  return {points:latticeScan(rgba,x1-x0,x0,y0,x0,y0,x1,y1,s,threshold,faithful&&s<=stroke),spacing:s,stroke};
+}
+// Both steps at once, for a single spacing.
+export function glyphLattice(width,height,draw,spacing,{box=null,threshold=0,faithful=false}={}){
+ return rasterLattice(glyphRaster(width,height,draw,{box}),spacing,{threshold,faithful});
 }
 // `draw(ctx)` paints the ink in CSS pixels; it is called twice: once on a 1x
 // canvas whose coverage becomes the particle lattice, and once on a

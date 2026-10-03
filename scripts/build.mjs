@@ -2,7 +2,7 @@ import {readFile,writeFile,mkdir,copyFile,cp,rm,readdir} from 'node:fs/promises'
 import {createHash} from 'node:crypto';
 import path from 'node:path';
 // Main page modules, in dependency order for the inlined offline file.
-const modules=['physics.mjs','render.mjs','glyphs.mjs','app.mjs'];
+const modules=['physics.mjs','render.mjs','glyphs.mjs','quality.mjs','app.mjs'];
 const files=['index.html','404.html','style.css',...modules];
 // Subpages are static folders that import the shared engine modules from ../
 const folders=['MS'];
@@ -29,7 +29,7 @@ const css=await readFile('src/style.css','utf8');
 const parts=[];
 for(const name of modules){
  let js=await readFile('src/'+name,'utf8');
- js=js.replace(/^import .*?;\s*/gm,'').replace(/^export (?=(?:class|function) )/gm,'');parts.push(js);
+ js=js.replace(/^import .*?;\s*/gm,'').replace(/^export (?=(?:class|function|const|let) )/gm,'');parts.push(js);
 }
 const script='(()=>{\n"use strict";\n'+parts.join('\n')+'\n})();\n';
 if(/<\/script/i.test(script)||/<\/style/i.test(css))throw new Error('Unsafe inline closing tag');

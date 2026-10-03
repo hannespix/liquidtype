@@ -69,7 +69,11 @@ class Fluid {
   for(const k of ['x','y','vx','vy','tx','ty','ax','ay','free'])this[k]=new Float32Array(this.n);
   points.forEach((p,i)=>{this.x[i]=this.tx[i]=p.x;this.y[i]=this.ty[i]=p.y;});
   this.h=spacing*2.4;this.cols=Math.ceil(width/this.h)+1;this.rows=Math.ceil(height/this.h)+1;
-  this.head=new Int32Array(this.cols*this.rows);this.next=new Int32Array(this.n);
+  // Neighbour grid as sorted cells: the particles of cell c lie together in
+  // `order`, from start[c] to start[c+1]. Contiguous cells are faster to walk
+  // than linked lists, which counts on slow and old devices.
+  const cells=this.cols*this.rows;
+  this.start=new Int32Array(cells+1);this.fillAt=new Int32Array(cells);this.cell=new Int32Array(this.n);this.order=new Int32Array(this.n);
  }
  reset(){this.x.set(this.tx);this.y.set(this.ty);this.vx.fill(0);this.vy.fill(0);this.free.fill(0);this.time=0;}
  // Uniform velocity change for the whole liquid, slightly varied over the
@@ -91,37 +95,53 @@ class Fluid {
  // that solo particles lack so they arrive without overshooting.
  step(dt,p,pointer=null){
   dt=Math.max(0,Math.min(1/60,dt));if(!dt)return;this.time+=dt;
-  const {n,x,y,vx,vy,ax,ay,tx,ty,free,h,cols,rows,head,next,spacing:s}=this;
+  const {n,x,y,vx,vy,ax,ay,tx,ty,free,h,cols,rows,start,fillAt,cell,order,spacing:s}=this;
   const gx=p.gravityX||0,gy=p.gravityY||0,drip=p.dripGravity||0,homing=p.homing||1;
-  const solo=!!p.solo;if(!solo)head.fill(-1);
+  const solo=!!p.solo,cells=cols*rows;if(!solo)start.fill(0);
   const brush=pointer?.down?pointer:null;
   for(let i=0;i<n;i++){
-   if(!solo){const c=Math.max(0,Math.min(cols-1,Math.floor(x[i]/h))),r=Math.max(0,Math.min(rows-1,Math.floor(y[i]/h)));const k=c+r*cols;next[i]=head[k];head[k]=i;}
-   const b=brush?Math.max(0,1-Math.hypot(x[i]-brush.x,y[i]-brush.y)/brush.radius):0;
-   const homeDistance=Math.hypot(tx[i]-x[i],ty[i]-y[i]);
-   const spring=(22+230*Math.exp(-homeDistance*homeDistance/(s*s*12)))*homing*(1-.98*b)*(1-free[i]);ax[i]=(tx[i]-x[i])*spring;ay[i]=(ty[i]-y[i])*spring+drip*free[i];
+   if(!solo){const c=Math.max(0,Math.min(cols-1,Math.floor(x[i]/h)))+Math.max(0,Math.min(rows-1,Math.floor(y[i]/h)))*cols;cell[i]=c;start[c+1]++;}
+   const bx=x[i]-(brush?brush.x:0),by=y[i]-(brush?brush.y:0);
+   const b=brush?Math.max(0,1-Math.sqrt(bx*bx+by*by)/brush.radius):0;
+   const hx=tx[i]-x[i],hy=ty[i]-y[i];
+   const spring=(22+230*Math.exp(-(hx*hx+hy*hy)/(s*s*12)))*homing*(1-.98*b)*(1-free[i]);ax[i]=hx*spring;ay[i]=hy*spring+drip*free[i];
    if(brush){ax[i]+=(brush.x-x[i])*b*22*p.strength;ay[i]+=(brush.y-y[i])*b*22*p.strength;}
   }
-  for(let i=0;i<(solo?0:n);i++){
-   const c=Math.floor(x[i]/h),r=Math.floor(y[i]/h);
-   for(let ry=Math.max(0,r-1);ry<=Math.min(rows-1,r+1);ry++)for(let cx=Math.max(0,c-1);cx<=Math.min(cols-1,c+1);cx++){
-    for(let j=head[cx+ry*cols];j!==-1;j=next[j]){
-     if(j<=i)continue;
-     let dx=x[j]-x[i],dy=y[j]-y[i],d2=dx*dx+dy*dy;if(d2>=h*h)continue;
-     if(d2<.0001){dx=(i%2?1:-1)*.01;dy=.007;d2=dx*dx+dy*dy;}
-     const d=Math.sqrt(d2),q=1-d/h,nx=dx/d,ny=dy/d;
-     const pressure=d<s*.93?-650*(s*.93-d):0;
-     const cohesion=(28+85*p.tension+70*p.attraction)*q;
-     const f=pressure+cohesion;
-     const visc=(.25+3*p.viscosity)*q;
-     const rx=tx[j]-tx[i],ry=ty[j]-ty[i],rd=Math.hypot(rx,ry);
-     let restX=0,restY=0;
-     if(rd>.0001&&rd<h){
-      const restForce=(rd<s*.93?-650*(s*.93-rd):0)+(28+85*p.tension+70*p.attraction)*(1-rd/h);
-      restX=rx/rd*restForce;restY=ry/rd*restForce;
+  if(!solo){
+   for(let c=0;c<cells;c++){start[c+1]+=start[c];fillAt[c]=start[c];}
+   for(let i=0;i<n;i++)order[fillAt[cell[i]]++]=i;
+   const h2=h*h,core=s*.93,bond=28+85*p.tension+70*p.attraction,thick=.25+3*p.viscosity;
+   // Forces between two particles within reach; i is the lower index.
+   const pair=(a,b)=>{
+    const i=a<b?a:b,j=a<b?b:a;
+    let dx=x[j]-x[i],dy=y[j]-y[i],d2=dx*dx+dy*dy;if(d2>=h2)return;
+    if(d2<.0001){dx=(i%2?1:-1)*.01;dy=.007;d2=dx*dx+dy*dy;}
+    const d=Math.sqrt(d2),q=1-d/h,nx=dx/d,ny=dy/d;
+    const f=(d<core?-650*(core-d):0)+bond*q;
+    const visc=thick*q;
+    const rx=tx[j]-tx[i],ry=ty[j]-ty[i],rd=Math.sqrt(rx*rx+ry*ry);
+    let restX=0,restY=0;
+    if(rd>.0001&&rd<h){
+     const restForce=(rd<core?-650*(core-rd):0)+bond*(1-rd/h);
+     restX=rx/rd*restForce;restY=ry/rd*restForce;
+    }
+    const fx=nx*f-restX+(vx[j]-vx[i])*visc,fy=ny*f-restY+(vy[j]-vy[i])*visc;
+    ax[i]+=fx;ay[i]+=fy;ax[j]-=fx;ay[j]-=fy;
+   };
+   // Every pair once: within the cell, then the cell to the right and the
+   // three cells below.
+   for(let cy=0;cy<rows;cy++)for(let cx=0;cx<cols;cx++){
+    const c=cx+cy*cols,a0=start[c],a1=start[c+1];if(a0===a1)continue;
+    const right=cx+1<cols,down=cy+1<rows,below=c+cols;
+    for(let ai=a0;ai<a1;ai++){
+     const a=order[ai];
+     for(let k=ai+1;k<a1;k++)pair(a,order[k]);
+     if(right)for(let k=start[c+1],e=start[c+2];k<e;k++)pair(a,order[k]);
+     if(down){
+      if(cx>0)for(let k=start[below-1],e=start[below];k<e;k++)pair(a,order[k]);
+      for(let k=start[below],e=start[below+1];k<e;k++)pair(a,order[k]);
+      if(right)for(let k=start[below+1],e=start[below+2];k<e;k++)pair(a,order[k]);
      }
-     const fx=nx*f-restX+(vx[j]-vx[i])*visc,fy=ny*f-restY+(vy[j]-vy[i])*visc;
-     ax[i]+=fx;ay[i]+=fy;ax[j]-=fx;ay[j]-=fy;
     }
    }
   }
@@ -224,12 +244,18 @@ class FluidRenderer {
  // grow 1 and amp 1 leave every drop as designed.
  // calm (0..1) ignores a drop's leftover speed for its look, e.g. at the end
  // of a page transition; 0 leaves motion visible.
- constructor(canvas,{paper=[.973,.973,.957],ink=[.016,.020,.019],dropShrink=1,fine={from:0,to:0,grow:1,amp:1},calm=0}={}){
-  this.paper=paper;this.ink=ink;this.dropShrink=dropShrink;this.fine=fine;this.calm=calm;
+ // maxScale caps the drawing resolution in device pixels per CSS pixel; a
+ // weak graphics chip draws far fewer pixels at 1 than at the usual 2.
+ constructor(canvas,{paper=[.973,.973,.957],ink=[.016,.020,.019],dropShrink=1,fine={from:0,to:0,grow:1,amp:1},calm=0,maxScale=2}={}){
+  this.paper=paper;this.ink=ink;this.dropShrink=dropShrink;this.fine=fine;this.calm=calm;this.maxScale=maxScale;
   const gl=canvas.getContext('webgl2',{alpha:false,antialias:false,powerPreference:'high-performance',depth:false,stencil:false});
   if(!gl)throw new Error('WebGL2 ist auf diesem Gerät nicht verfügbar.');
   this.gl=gl;this.canvas=canvas;this.floatSurface=!!gl.getExtension('EXT_color_buffer_float');
   this.points=this.program(vertex,drop);this.surface=this.program(screen,surface);
+  // Uniform locations are looked up once instead of on every frame.
+  const where=(program,names)=>Object.fromEntries(names.map(n=>[n,gl.getUniformLocation(program,n)]));
+  this.at=where(this.points,['resolution','pointScale','maxPoint','glyphMaterial','pixelScale','shrink','fine','fineAmp']);
+  this.surfaceAt=where(this.surface,['density','texel','paper','ink']);
   this.buffer=gl.createBuffer();this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
   for(const [name,size,offset] of [['position',2,0],['home',2,8],['deformation',1,16],['size',1,20]]){const loc=gl.getAttribLocation(this.points,name);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,size,gl.FLOAT,false,24,offset);}
   this.glyph=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4));
@@ -247,10 +273,12 @@ class FluidRenderer {
   const gl=this.gl;gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);gl.activeTexture(gl.TEXTURE0);
  }
  resize(w,h){
-  const gl=this.gl;this.w=w;this.h=h;this.scale=Math.min(devicePixelRatio||1,2,2400/w);this.canvas.width=Math.round(w*this.scale);this.canvas.height=Math.round(h*this.scale);
+  const gl=this.gl;this.w=w;this.h=h;this.scale=Math.min(devicePixelRatio||1,this.maxScale,2,2400/w);this.canvas.width=Math.round(w*this.scale);this.canvas.height=Math.round(h*this.scale);
   gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texImage2D(gl.TEXTURE_2D,0,this.floatSurface?gl.RGBA16F:gl.RGBA8,this.canvas.width,this.canvas.height,0,gl.RGBA,this.floatSurface?gl.HALF_FLOAT:gl.UNSIGNED_BYTE,null);
   gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbo);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,this.texture,0);
-  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('Die Grafikoberfläche konnte nicht angelegt werden.');
+  // The completeness check stalls the graphics pipeline, so only the first
+  // surface is checked; later ones only change size, not format.
+  if(!this.checked){if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('Die Grafikoberfläche konnte nicht angelegt werden.');this.checked=true;}
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);
  }
  // dropSpacing sets the drawn drop size, or fluid.dropSize sets it per
@@ -266,17 +294,20 @@ class FluidRenderer {
    // quiets leftover jitter and sub-pixel offsets; a drop still clearly away
    // from home keeps its liquid look, so it never draws the type shifted.
    const size=sizes?sizes[i]:dropSpacing,unit=sizes?Math.max(fluid.spacing,size):fluid.spacing;
-   this.data[k+4]=Math.hypot(fluid.x[i]-fluid.tx[i],fluid.y[i]-fluid.ty[i])/(unit*(3-2*stir))+Math.hypot(fluid.vx[i],fluid.vy[i])/(unit*12)*stir;
+   const dx=fluid.x[i]-fluid.tx[i],dy=fluid.y[i]-fluid.ty[i],vx=fluid.vx[i],vy=fluid.vy[i];
+   this.data[k+4]=Math.sqrt(dx*dx+dy*dy)/(unit*(3-2*stir))+Math.sqrt(vx*vx+vy*vy)/(unit*12)*stir;
    this.data[k+5]=size;
   }
   gl.viewport(0,0,this.canvas.width,this.canvas.height);
   gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbo);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
   gl.useProgram(this.points);gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,this.data,gl.DYNAMIC_DRAW);
-  gl.uniform2f(gl.getUniformLocation(this.points,'resolution'),this.w,this.h);gl.uniform1f(gl.getUniformLocation(this.points,'pointScale'),4.2*this.scale);gl.uniform1f(gl.getUniformLocation(this.points,'maxPoint'),this.maxPointSize);
-  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.uniform1i(gl.getUniformLocation(this.points,'glyphMaterial'),1);gl.uniform2f(gl.getUniformLocation(this.points,'pixelScale'),this.canvas.width/this.w,this.canvas.height/this.h);gl.uniform1f(gl.getUniformLocation(this.points,'shrink'),this.dropShrink);gl.uniform3f(gl.getUniformLocation(this.points,'fine'),this.fine.from,Math.max(this.fine.to,this.fine.from+.001),this.fine.grow);gl.uniform1f(gl.getUniformLocation(this.points,'fineAmp'),this.fine.amp);
+  const at=this.at;
+  gl.uniform2f(at.resolution,this.w,this.h);gl.uniform1f(at.pointScale,4.2*this.scale);gl.uniform1f(at.maxPoint,this.maxPointSize);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.uniform1i(at.glyphMaterial,1);gl.uniform2f(at.pixelScale,this.canvas.width/this.w,this.canvas.height/this.h);gl.uniform1f(at.shrink,this.dropShrink);gl.uniform3f(at.fine,this.fine.from,Math.max(this.fine.to,this.fine.from+.001),this.fine.grow);gl.uniform1f(at.fineAmp,this.fine.amp);
   gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE);gl.drawArrays(gl.POINTS,0,fluid.n);gl.disable(gl.BLEND);
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.useProgram(this.surface);gl.bindVertexArray(null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.texture);
-  gl.uniform1i(gl.getUniformLocation(this.surface,'density'),0);gl.uniform2f(gl.getUniformLocation(this.surface,'texel'),1/this.canvas.width,1/this.canvas.height);gl.uniform3fv(gl.getUniformLocation(this.surface,'paper'),this.paper);gl.uniform3fv(gl.getUniformLocation(this.surface,'ink'),this.ink);gl.drawArrays(gl.TRIANGLES,0,3);
+  const sat=this.surfaceAt;
+  gl.uniform1i(sat.density,0);gl.uniform2f(sat.texel,1/this.canvas.width,1/this.canvas.height);gl.uniform3fv(sat.paper,this.paper);gl.uniform3fv(sat.ink,this.ink);gl.drawArrays(gl.TRIANGLES,0,3);
  }
 }
 
@@ -316,30 +347,43 @@ function strokeWidth(rgba,stride,rows){
  for(let y=0;y<rows;y++)for(let x=0;x<stride;x++){
   const k=(y*stride+x)*4+3,a=rgba[k]/255;area+=a;
   const right=x+1<stride?rgba[k+4]/255:0,below=y+1<rows?rgba[k+stride*4]/255:0;
-  edge+=Math.hypot(right-a,below-a);
+  const ex=right-a,ey=below-a;edge+=Math.sqrt(ex*ex+ey*ey);
  }
  return edge>0?2*area/edge:0;
 }
-// Particles on a fixed lattice, optionally only inside `box` {x0,y0,x1,y1}.
-// `spacing` is a number or a function of the ink's stroke width, so the
-// lattice can follow the weight of the type. With `faithful`, a lattice no
-// coarser than the strokes takes cells by their centre, so the particles
-// carry the type's own weight (every stroke still crosses a cell centre).
-// Returns the points, the spacing used and the stroke width. One scratch
-// canvas is reused; only the box is cleared and read back.
+// Ink painted by `draw`, read back only inside `box` {x0,y0,x1,y1} (or the
+// whole area). One scratch canvas is reused; only the box is cleared. The
+// result can be scanned at several spacings without painting again; its
+// stroke width is measured once, when first asked for.
 let latticeCanvas=null;
-function glyphLattice(width,height,draw,spacing,{box=null,threshold=0,faithful=false}={}){
+function glyphRaster(width,height,draw,{box=null}={}){
  const cw=Math.ceil(width),ch=Math.ceil(height);
- if(!latticeCanvas||latticeCanvas.width<cw||latticeCanvas.height<ch){latticeCanvas=document.createElement('canvas');latticeCanvas.width=cw;latticeCanvas.height=ch;}
- const ctx=latticeCanvas.getContext('2d',{willReadFrequently:true});
  const x0=Math.max(0,Math.floor(box?box.x0:0)),y0=Math.max(0,Math.floor(box?box.y0:0));
  const x1=Math.min(width,Math.ceil(box?box.x1:width)),y1=Math.min(height,Math.ceil(box?box.y1:height));
- if(x1<=x0||y1<=y0)return {points:[],spacing:typeof spacing==='number'?spacing:0,stroke:0};
+ if(x1<=x0||y1<=y0)return {rgba:null,x0,y0,x1:x0,y1:y0,stroke:0};
+ if(!latticeCanvas||latticeCanvas.width<cw||latticeCanvas.height<ch){latticeCanvas=document.createElement('canvas');latticeCanvas.width=cw;latticeCanvas.height=ch;}
+ const ctx=latticeCanvas.getContext('2d',{willReadFrequently:true});
  ctx.clearRect(x0,y0,x1-x0,y1-y0);ctx.save();draw(ctx);ctx.restore();
  const rgba=ctx.getImageData(x0,y0,x1-x0,y1-y0).data;
- const stroke=typeof spacing==='number'&&!faithful?0:strokeWidth(rgba,x1-x0,y1-y0);
+ let stroke=null;
+ return {rgba,x0,y0,x1,y1,get stroke(){return stroke??=strokeWidth(rgba,x1-x0,y1-y0);}};
+}
+// Particles on a fixed lattice over a raster. `spacing` is a number or a
+// function of the ink's stroke width, so the lattice can follow the weight of
+// the type. With `faithful`, a lattice no coarser than the strokes takes
+// cells by their centre, so the particles carry the type's own weight (every
+// stroke still crosses a cell centre). Returns the points, the spacing used
+// and the stroke width.
+function rasterLattice(raster,spacing,{threshold=0,faithful=false}={}){
+ const {rgba,x0,y0,x1,y1}=raster;
+ const stroke=typeof spacing==='number'&&!faithful?0:raster.stroke;
  const s=typeof spacing==='number'?spacing:spacing(stroke);
+ if(!rgba)return {points:[],spacing:s,stroke};
  return {points:latticeScan(rgba,x1-x0,x0,y0,x0,y0,x1,y1,s,threshold,faithful&&s<=stroke),spacing:s,stroke};
+}
+// Both steps at once, for a single spacing.
+function glyphLattice(width,height,draw,spacing,{box=null,threshold=0,faithful=false}={}){
+ return rasterLattice(glyphRaster(width,height,draw,{box}),spacing,{threshold,faithful});
 }
 // `draw(ctx)` paints the ink in CSS pixels; it is called twice: once on a 1x
 // canvas whose coverage becomes the particle lattice, and once on a
@@ -362,6 +406,88 @@ function sampleGlyphs(width,height,draw,budget){
  return {points,spacing,material};
 }
 
+// Quality for slow and old devices, shared by every Liquid Type page.
+// Two dials: the drawing resolution (device pixels per CSS pixel) for weak
+// graphics chips, and the share of particles for weak processors. A first
+// guess comes from what the device reports about itself; after that the
+// frame rate decides. When frames stay slow, the dial that costs the time is
+// turned down one notch: the processor's if the page's own work fills most of
+// the frame, otherwise the graphics chip's. Dials never turn back up within a
+// visit, so the picture does not pump. Strong devices keep full quality.
+const RESOLUTION=[2,1.5,1,.75];
+const PARTICLES=[1,.8,.62,.48];
+const KEY='lt-quality',SLOW_MS=22,VERY_SLOW_MS=40,WINDOW=40,WARMUP=45,LONGEST_MS=250;
+const clampLevel=v=>Math.max(0,Math.min(RESOLUTION.length-1,v|0));
+
+// A first guess from the device's own reports: software rendering, few
+// cores, little memory or no float render targets mean an old or weak device.
+function guessLevels(gl,{cores=globalThis.navigator?.hardwareConcurrency,memory=globalThis.navigator?.deviceMemory,floatSurface=true}={}){
+ let res=0,part=0;
+ let name='';
+ try{
+  name=String(gl?.getParameter(gl.RENDERER)||'');
+  if(/^webkit webgl$/i.test(name)){const info=gl.getExtension('WEBGL_debug_renderer_info');if(info)name=String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)||name);}
+ }catch{/* renderer name is optional */}
+ if(/swiftshader|llvmpipe|softpipe|software|basic render/i.test(name)){res=Math.max(res,2);part=Math.max(part,1);}
+ if(cores>0&&cores<=2)part=Math.max(part,2);else if(cores>0&&cores<=4)part=Math.max(part,1);
+ if(memory>0&&memory<=2){part=Math.max(part,2);res=Math.max(res,1);}else if(memory>0&&memory<=4)res=Math.max(res,1);
+ if(!floatSurface)res=Math.max(res,1);
+ return {res,part};
+}
+
+// `onChange({resolution,particles,changed})` runs after a dial moved
+// ('resolution' or 'particles'). `?quality=0` (full) to `?quality=3` (lowest)
+// fixes both dials and switches the watching off, e.g. for comparisons.
+function createQuality(gl,{floatSurface=true,onChange=()=>{},search=globalThis.location?.search||'',hints}={}){
+ const forced=new URLSearchParams(search).get('quality');
+ let res=0,part=0,watching=true;
+ if(forced!==null&&/^[0-3]$/.test(forced)){res=part=Number(forced);watching=false;}
+ else{
+  const guess=guessLevels(gl,{floatSurface,...hints});
+  let saved={};try{saved=JSON.parse(globalThis.sessionStorage?.getItem(KEY)||'{}');}catch{/* storage unavailable */}
+  res=clampLevel(Math.max(guess.res,saved.res|0));part=clampLevel(Math.max(guess.part,saved.part|0));
+ }
+ const intervals=[],works=[];let warm=WARMUP;
+ const sorted=a=>[...a].sort((x,y)=>x-y);
+ const q={
+  get resolution(){return RESOLUTION[res];},
+  get particles(){return PARTICLES[part];},
+  get level(){return {res,part};},
+  // Forget recent frames, e.g. after a pause, a resize or a new shape.
+  reset(){intervals.length=works.length=0;warm=WARMUP;},
+  // One drawn frame: time since the previous one and the page's own work in
+  // it, both in ms.
+  frame(interval,work){
+   if(!watching||!(interval>0))return;
+   if(interval>LONGEST_MS){q.reset();return;}
+   if(warm>0){warm--;return;}
+   intervals.push(interval);works.push(work);
+   if(intervals.length<WINDOW)return;
+   const spans=sorted(intervals),slow=spans[spans.length>>1],busy=sorted(works)[works.length>>1];
+   intervals.shift();works.shift();
+   if(slow<=SLOW_MS)return;
+   let changed=null;
+   // Evenly spaced frames near 30 per second with little own work are most
+   // likely a capped screen (a phone saving power), not a weak device: one
+   // resolution notch at most, then the watching stops.
+   const steady=slow>28&&slow<38&&spans[Math.floor(spans.length*.9)]-spans[Math.floor(spans.length*.1)]<4&&busy<slow*.3;
+   if(steady){if(res>0){watching=false;return;}res++;changed='resolution';}
+   else{
+    // The last notch of either dial only for clearly struggling devices.
+    const room=level=>level<RESOLUTION.length-2||(level<RESOLUTION.length-1&&slow>VERY_SLOW_MS);
+    if(busy>slow*.55&&room(part)){part++;changed='particles';}
+    else if(room(res)){res++;changed='resolution';}
+    else if(room(part)){part++;changed='particles';}
+    if(!changed){if(res===RESOLUTION.length-1&&part===PARTICLES.length-1)watching=false;return;}
+   }
+   try{globalThis.sessionStorage?.setItem(KEY,JSON.stringify({res,part}));}catch{/* storage unavailable */}
+   q.reset();
+   onChange({resolution:RESOLUTION[res],particles:PARTICLES[part],changed});
+  },
+ };
+ return q;
+}
+
 const $=id=>document.getElementById(id);
 const canvas=$('fluid'),wrap=$('canvasWrap'),input=$('textInput'),cursor=$('cursor');
 // No alternate text layer: the only visible typography is the particle surface.
@@ -372,7 +498,7 @@ function disturb(x,y,dx,dy,radius){
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 const controls=['viscosity','tension','attraction','strength'];
 const parameters={viscosity:.35,tension:.65,attraction:.5,strength:1.3};
-let renderer=null,fluid=null,paused=reduced.matches,failed=false,w=0,h=0,last=0,accumulator=0,textTimer,resizeTimer;
+let renderer=null,fluid=null,paused=reduced.matches,failed=false,w=0,h=0,last=0,accumulator=0,textTimer,resizeTimer,quality=null;
 const pointer={x:-1000,y:-1000,down:false,radius:95,id:null,last:0};
 function updateStatus(){
  $('pause').setAttribute('aria-pressed',String(paused));$('pauseLabel').textContent=paused?'Fortsetzen':'Pause';$('pauseIcon').textContent=paused?'▶':'Ⅱ';
@@ -389,7 +515,7 @@ function maskPoints(text,width,height){
  let size=Math.min(height*.63,width*.7,330);ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
  const measured=ctx.measureText(text).width;size*=Math.min(1,width*.86/Math.max(1,measured));ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
  const m=ctx.measureText(text),font=ctx.font,baseline=height/2+(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2;
- const {points,spacing,material}=sampleGlyphs(width,height,g=>{g.font=font;g.textAlign='center';g.fillStyle='black';g.fillText(text,width/2,baseline);},width<700?2200:4200);
+ const {points,spacing,material}=sampleGlyphs(width,height,g=>{g.font=font;g.textAlign='center';g.fillStyle='black';g.fillText(text,width/2,baseline);},Math.round((width<700?2200:4200)*(quality?.particles??1)));
  renderer?.setMaterial(material);
  return {points,spacing};
 }
@@ -416,12 +542,20 @@ function showFailure(message){failed=true;canvas.style.visibility='hidden';$('fa
 function setup(){
  try{
   renderer=new FluidRenderer(canvas);failed=false;canvas.style.visibility='visible';$('fallback').hidden=true;
+  quality??=createQuality(renderer.gl,{floatSurface:renderer.floatSurface,onChange:applyQuality});renderer.maxScale=quality.resolution;
   resize();updateStatus();
  }catch(error){console.warn('Liquid Type graphics:',error);showFailure('Die interaktive Grafik ist gerade nicht verfügbar. Bitte versuche es mit aktivierter Hardwarebeschleunigung in einem aktuellen Browser.');}
 }
+// A slow device turned a quality dial down: draw fewer pixels, or rebuild
+// the text from fewer particles.
+function applyQuality({changed}){
+ if(!renderer||failed||!w||!h)return;
+ if(changed==='resolution'){renderer.maxScale=quality.resolution;renderer.resize(w,h);draw();}
+ else setText(input.value);
+}
 function resize(){
  const rect=wrap.getBoundingClientRect();const nw=Math.max(100,Math.round(rect.width)),nh=Math.max(160,Math.round(rect.height));
- if(nw===w&&nh===h&&fluid&&renderer?.w===w)return;w=nw;h=nh;pointer.radius=Math.max(60,Math.min(110,w*.13));
+ if(nw===w&&nh===h&&fluid&&renderer?.w===w)return;w=nw;h=nh;pointer.radius=Math.max(60,Math.min(110,w*.13));quality?.reset();
  if(renderer&&!failed)renderer.resize(w,h);setText(input.value,false);
 }
 input.addEventListener('input',()=>{clearTimeout(textTimer);$('charCount').textContent=Array.from(input.value).length+' / 32';textTimer=setTimeout(()=>setText(input.value),130);});
@@ -463,19 +597,23 @@ window.addEventListener('scroll',()=>{
  }
 },{passive:true});
 new ResizeObserver(()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{try{resize();}catch{showFailure('Die Grafik konnte nicht angepasst werden. Bitte lade die Ansicht neu.');}},100);}).observe(wrap);
-document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;pointer.down=false;pointer.id=null;cursor.classList.remove('dragging');});
+document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;pointer.down=false;pointer.id=null;cursor.classList.remove('dragging');quality?.reset();});
 reduced.addEventListener('change',e=>{if(e.matches)setPaused(true);});
 function frame(t){
  requestAnimationFrame(frame);
  if(document.hidden){last=0;return;}
- const dt=last?Math.min(.04,(t-last)/1000):0;last=t;
+ const interval=last?t-last:0,dt=Math.min(.04,interval/1000);last=t;
  if(paused||failed||!fluid)return;
- accumulator=Math.min(.04,accumulator+dt);
+ // With fewer particles chosen for a slow processor, a late frame no longer
+ // catches up the full time: the liquid briefly slows instead of stuttering.
+ const work=performance.now(),cap=(quality?.level.part??0)>=2?1/40:.04;
+ accumulator=Math.min(cap,accumulator+dt);
  while(accumulator>=1/120){
   const tick=1/120;
   fluid.step(tick,parameters,pointer);accumulator-=tick;
  }
  draw();
+ quality?.frame(interval,performance.now()-work);
 }
 setup();updateStatus();requestAnimationFrame(frame);
 // Expose the same visible controls to compatible browsers; no network or storage.
