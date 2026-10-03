@@ -1,12 +1,12 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=c8b3c27e';
-import {FluidRenderer} from '../render.mjs?v=c8b3c27e';
-import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=c8b3c27e';
-import {matchPoints} from './match.mjs?v=c8b3c27e';
-import {restrain,sagWeight} from './coupling.mjs?v=c8b3c27e';
-import {createQuality} from '../quality.mjs?v=c8b3c27e';
-import {Upright} from './sensors.mjs?v=c8b3c27e';
-import {DropChain,DropOutline} from './cursor.mjs?v=c8b3c27e';
+import {Fluid} from '../physics.mjs?v=d7a59191';
+import {FluidRenderer} from '../render.mjs?v=d7a59191';
+import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=d7a59191';
+import {matchPoints} from './match.mjs?v=d7a59191';
+import {restrain,sagWeight} from './coupling.mjs?v=d7a59191';
+import {createQuality} from '../quality.mjs?v=d7a59191';
+import {Upright} from './sensors.mjs?v=d7a59191';
+import {DropChain,DropOutline} from './cursor.mjs?v=d7a59191';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),back=$('back'),crumb=$('crumb'),hint=$('hint'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -490,7 +490,8 @@ let current=null,transition=null,homeEntry=null;
 function viewFromHash(){const name=decodeURIComponent(location.hash.slice(1));return views.has(name)?name:'home';}
 function chrome(name){
  const label=views.get(name).getAttribute('aria-label');
- back.hidden=name==='home';crumb.textContent=label;
+ // The home page names nothing in the corner; sections show where one is.
+ back.hidden=name==='home';crumb.textContent=name==='home'?'':label;
  document.title=name==='home'?baseTitle:`${label} — Matthias Sütterlin`;
 }
 const canMorph=()=>!!renderer&&!reducedMotion.matches&&!home.classList.contains('no-liquid');
