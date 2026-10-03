@@ -60,6 +60,7 @@ Unter `/MS/` liegt eine Studie der Website von Matthias Sütterlin (Innenarchite
 
 - Die Seite ist auf `noindex` gesetzt und verweist per `canonical` auf das Original, damit Suchmaschinen keine Dublette führen. Einen sichtbaren Hinweis auf Liquid Type oder das Original gibt es nicht.
 - Die Schrift Playfair Display (Bold, lateinischer Zeichensatz) liegt selbst gehostet in `src/MS/fonts/` mit ihrer Lizenz (SIL Open Font License 1.1). Es werden keine externen Dienste geladen.
+- Die Seite erklärt sich nicht selbst: Es gibt weder einen Einführungsdialog noch Bedienhinweise, Besucher finden durch Ausprobieren heraus, was geht. Nur wenn Bewegungsdaten nicht verfügbar sind, erscheint unter der Linie eine kurze Meldung.
 - Bereiche sind per Adresse erreichbar, zum Beispiel `/MS/#projects`; Browser-Zurück funktioniert. Escape führt eine Ebene zurück.
 - Mit der Tastatur zeigt ein feiner Strich unter M oder S, welcher Buchstabe den Fokus hat. Kehrt die Seite selbst zur Startseite zurück, etwa nach Escape, landet der Fokus ohne Markierung auf dem M; der Strich erscheint mit dem nächsten Tastendruck.
 - Die zupfbare Linie unter der Tagline ist eine echte Grenze für die Flüssigkeit: Nach oben gezogen hebt sie die Buchstabenböden an, nach dem Loslassen schwingt sie durch die Schrift. Flüssigkeit, die nach unten gezogen wird, sammelt sich auf der Linie und drückt sie durch.

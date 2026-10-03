@@ -1,14 +1,14 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=f489bc93';
-import {FluidRenderer} from '../render.mjs?v=f489bc93';
-import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=f489bc93';
-import {matchPoints} from './match.mjs?v=f489bc93';
-import {restrain,sagWeight} from './coupling.mjs?v=f489bc93';
-import {createQuality} from '../quality.mjs?v=f489bc93';
-import {Upright} from './sensors.mjs?v=f489bc93';
+import {Fluid} from '../physics.mjs?v=0a109179';
+import {FluidRenderer} from '../render.mjs?v=0a109179';
+import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=0a109179';
+import {matchPoints} from './match.mjs?v=0a109179';
+import {restrain,sagWeight} from './coupling.mjs?v=0a109179';
+import {createQuality} from '../quality.mjs?v=0a109179';
+import {Upright} from './sensors.mjs?v=0a109179';
 
 const $=id=>document.getElementById(id);
-const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
+const home=$('home'),canvas=$('liquid'),initials=$('initials'),back=$('back'),crumb=$('crumb'),hint=$('hint'),hintText=$('hintText'),motionButton=$('motionButton');
 const letters=[...initials.querySelectorAll('.initial')];
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 // The sweet spot: heavy and cohesive, but still alive. Viscosity below
@@ -89,10 +89,9 @@ function settling(t){
 const magnet={x:0,y:0,down:true,radius:0};
 const darkScheme=matchMedia('(prefers-color-scheme: dark)');
 const isHome=()=>home.classList.contains('is-active');
-function setHint(note){
- hintText.textContent=note||(motion.active?'Antippen öffnet. Ziehen, Neigen oder Schütteln bewegt. Halten lässt platzen.':'Antippen öffnet. Ziehen bewegt. Halten lässt platzen.');
- scheduleGrid();
-}
+// The page explains nothing; visitors find out by trying. The line under the
+// letters only reports when motion sensors turn out to be unavailable.
+function setHint(note){hintText.textContent=note||'';hint.hidden=!note;scheduleGrid();}
 // Paper and ink follow the stylesheet, including its dark scheme.
 function cssColor(name){
  const value=getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -212,7 +211,7 @@ function startDrip(t){
 function effects(t){
  if(burstUntil&&t>burstUntil){fluid.free.fill(0);burstUntil=0;}
  if(drip){if(t>drip.until){for(const i of drip.indices)fluid.free[i]=0;drip=null;nextDrip=t+tune.dripMin+Math.random()*Math.max(0,tune.dripMax-tune.dripMin);}}
- else if(t>nextDrip){if(!reducedMotion.matches&&!pointer.down&&!burstUntil&&!intro.open&&calm())startDrip(t);else nextDrip=t+800;}
+ else if(t>nextDrip){if(!reducedMotion.matches&&!pointer.down&&!burstUntil&&calm())startDrip(t);else nextDrip=t+800;}
 }
 function scheduleRebuild(){clearTimeout(rebuildTimer);rebuildTimer=setTimeout(()=>rebuild(),120);}
 // 0 during a flight, rising smoothly to 1 between calmFrom and calmTo.
@@ -641,7 +640,7 @@ function go(name){
 document.addEventListener('click',e=>{const target=e.target.closest('[data-go]');if(target)go(target.dataset.go);});
 back.addEventListener('click',()=>go(parents[current]||'home'));
 window.addEventListener('popstate',()=>show(viewFromHash()));
-window.addEventListener('keydown',e=>{if(e.key==='Escape'&&!intro.open&&current!=='home')go(parents[current]||'home');});
+window.addEventListener('keydown',e=>{if(e.key==='Escape'&&current!=='home')go(parents[current]||'home');});
 
 // ------------------------------------------------------------------ tune ---
 // Sliders for every dial above plus the physics parameters. Values live in
@@ -829,10 +828,6 @@ if(gridOn()){
  scheduleGrid();
 }
 
-// ----------------------------------------------------------------- intro ---
-function closeIntro(){if(intro.open)intro.close();}
-intro.addEventListener('close',()=>{try{sessionStorage.setItem('ms-intro-seen','1');}catch{/* storage unavailable */}});
-intro.addEventListener('click',e=>{if(e.target===intro)closeIntro();});
 
 // ------------------------------------------------------- pluckable lines ---
 const SVG='http://www.w3.org/2000/svg';
@@ -951,11 +946,9 @@ function glideLand(){
 
 // ----------------------------------------------------------------- start ---
 show(viewFromHash(),false);
-let introSeen=false;try{introSeen=sessionStorage.getItem('ms-intro-seen')==='1';}catch{/* storage unavailable */}
-if(!introSeen&&current==='home'&&typeof intro.showModal==='function'){intro.showModal();setTimeout(closeIntro,12000);}
 createRenderer();
 try{await document.fonts?.load('700 100px "Playfair Display"');}catch{/* fallback serif */}
 rebuild(true);
-if(intro.open)intro.addEventListener('close',scatter,{once:true});else scatter();
+scatter();
 document.fonts?.ready.then(()=>rebuild());
 requestAnimationFrame(frame);
