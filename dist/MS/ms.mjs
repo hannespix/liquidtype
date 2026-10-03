@@ -1,10 +1,11 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=1c24c9fa';
-import {FluidRenderer} from '../render.mjs?v=1c24c9fa';
-import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=1c24c9fa';
-import {matchPoints} from './match.mjs?v=1c24c9fa';
-import {restrain,sagWeight} from './coupling.mjs?v=1c24c9fa';
-import {createQuality} from '../quality.mjs?v=1c24c9fa';
+import {Fluid} from '../physics.mjs?v=73f33156';
+import {FluidRenderer} from '../render.mjs?v=73f33156';
+import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=73f33156';
+import {matchPoints} from './match.mjs?v=73f33156';
+import {restrain,sagWeight} from './coupling.mjs?v=73f33156';
+import {createQuality} from '../quality.mjs?v=73f33156';
+import {Upright} from './sensors.mjs?v=73f33156';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -331,22 +332,31 @@ document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;release({
 // change of the gravity direction per event, tune.leanGain is a faint force
 // toward the tilt that relaxes within LEAN_RELAX seconds.
 const LEAN_RELAX=2,NUDGE_LIMIT=260,SENSOR_TIMEOUT=300,SENSOR_WAIT=2500;
-const motion={active:false,gravity:null,pose:null,last:0,events:0,waiting:0};
+const motion={active:false,gravity:null,pose:null,last:0,events:0,waiting:0,since:0};
+// Sensor axes differ between devices and browsers (see sensors.mjs): the
+// phone's own resting readings tell which way is down on the screen. Learned
+// anew whenever the screen turns.
+const upright=new Upright(),UPRIGHT_WAIT=1500;
+const screenAngle=()=>screen.orientation?.angle??window.orientation??0;
+const relearnUpright=()=>{upright.forget();motion.since=0;};
+screen.orientation?.addEventListener?.('change',relearnUpright);window.addEventListener('orientationchange',relearnUpright);
 const debug=new URLSearchParams(location.search).has('debug')?Object.assign(document.body.appendChild(document.createElement('pre')),{className:'debug'}):null;
 // With ?debug the running simulation is reachable from the console for tuning.
 if(debug)window.liquidType={get fluid(){return fluid;},get drip(){return drip;},get parameters(){return parameters;},get motion(){return motion;},get renderer(){return renderer;},get transition(){return transition;},get quality(){return quality;}};
-// Device frame (x right, y up in portrait) to canvas frame (x right, y down)
-// as the direction the liquid moves: opposite to the device's own acceleration.
-function liquidDirection(x,y){
- const angle=(screen.orientation?.angle??window.orientation??0)*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
- return {x:-(x*c-y*s),y:x*s+y*c};
-}
+// Device reading to the direction the liquid moves on the canvas (x right,
+// y down): opposite to the device's own acceleration, aligned with the screen.
+const liquidDirection=(x,y)=>upright.direction(x,y,screenAngle());
 const clampNudge=v=>Math.max(-NUDGE_LIMIT,Math.min(NUDGE_LIMIT,v));
 function onMotion(e){
  const g=e.accelerationIncludingGravity;
  if(!g||g.x==null||g.y==null)return;
  const now=performance.now(),dt=motion.last?Math.min(.1,(now-motion.last)/1000):0;motion.last=now;motion.events++;
  if(!motion.active){motion.active=true;clearTimeout(motion.waiting);motionButton.hidden=true;setHint();}
+ // Until the alignment is known the readings move nothing; a phone lying flat
+ // keeps the standard alignment after a moment.
+ if(!motion.since)motion.since=now;
+ upright.add(g.x,g.y,screenAngle());
+ const aligned=upright.turn!==null||now-motion.since>UPRIGHT_WAIT;
  if(!motion.gravity){motion.gravity={x:g.x,y:g.y};motion.pose={x:g.x,y:g.y};return;}
  const before={x:motion.gravity.x,y:motion.gravity.y},fast=1-Math.exp(-dt*10),slow=1-Math.exp(-dt/LEAN_RELAX);
  motion.gravity.x+=(g.x-before.x)*fast;motion.gravity.y+=(g.y-before.y)*fast;
@@ -354,9 +364,9 @@ function onMotion(e){
  const a=e.acceleration,ax=a&&a.x!=null?a.x:g.x-motion.gravity.x,ay=a&&a.y!=null?a.y:g.y-motion.gravity.y;
  const shake=liquidDirection(ax,ay),turn=liquidDirection(motion.gravity.x-before.x,motion.gravity.y-before.y),lean=liquidDirection(motion.gravity.x-motion.pose.x,motion.gravity.y-motion.pose.y);
  const dx=clampNudge(shake.x*tune.shakeGain*dt+turn.x*tune.tiltGain),dy=clampNudge(shake.y*tune.shakeGain*dt+turn.y*tune.tiltGain);
- if(fluid&&isHome()&&!document.hidden&&Math.hypot(dx,dy)>1.5){fluid.nudge(dx,dy);idleSince=now;}
- parameters.gravityX=lean.x*tune.leanGain;parameters.gravityY=lean.y*tune.leanGain;
- if(debug)debug.textContent=`sensor aktiv · ${motion.events} ereignisse\na ${ax.toFixed(2)} ${ay.toFixed(2)}  g ${g.x.toFixed(2)} ${g.y.toFixed(2)} ${(g.z??0).toFixed(2)}\nschub ${dx.toFixed(0)} ${dy.toFixed(0)} px/s  lehnen ${parameters.gravityX.toFixed(0)} ${parameters.gravityY.toFixed(0)}`;
+ if(aligned&&fluid&&isHome()&&!document.hidden&&Math.hypot(dx,dy)>1.5){fluid.nudge(dx,dy);idleSince=now;}
+ parameters.gravityX=aligned?lean.x*tune.leanGain:0;parameters.gravityY=aligned?lean.y*tune.leanGain:0;
+ if(debug)debug.textContent=`sensor aktiv · ${motion.events} ereignisse · ausrichtung ${upright.turn===null?(aligned?'standard':'lernt'):upright.turn*90+'°'} · bildschirm ${screenAngle()}°\na ${ax.toFixed(2)} ${ay.toFixed(2)}  g ${g.x.toFixed(2)} ${g.y.toFixed(2)} ${(g.z??0).toFixed(2)}\nschub ${dx.toFixed(0)} ${dy.toFixed(0)} px/s  lehnen ${parameters.gravityX.toFixed(0)} ${parameters.gravityY.toFixed(0)}`;
 }
 // Without fresh sensor data the lean must not linger.
 function settleMotion(t){if(motion.last&&t-motion.last>SENSOR_TIMEOUT)parameters.gravityX=parameters.gravityY=0;}
