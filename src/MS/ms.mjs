@@ -45,6 +45,12 @@ const defaults={
  // letters ride; their swing (stiffness, damping) and how hard scrolling
  // plucks them.
  gridSpacing:.2,gridStiffness:150,gridDamping:2.2,gridScroll:1.6,
+ // On the sub pages, where the text is read, the strings are calm: a
+ // grabbed string follows only pagePull of the pointer's pull, lets go
+ // after pageSnap string spacings, settles quickly (pageStiffness,
+ // pageDamping) and scrolling plucks it with pageScroll, at most
+ // pageScrollMax string spacings. Links and buttons there never move.
+ pageStiffness:240,pageDamping:11,pagePull:.22,pageSnap:.5,pageScroll:.35,pageScrollMax:.12,
  // Drops in motion may draw smaller than at rest (1 = full size).
  dropShrink:1,
  // In a page transition every moving drop reaches flightReach times as far
@@ -732,6 +738,7 @@ const TUNE=[
  ['Sensoren','shakeGain','Schütteln',0,2000,10],['Sensoren','tiltGain','Kippen',0,300,1],['Sensoren','leanGain','Neigen (Schwerkraft)',0,500,5],
  ['Übergang','morphMs','Flugzeit (ms)',300,2500,50],['Übergang','morphViscosity','Zähigkeit im Flug',0,1,.01],['Übergang','morphHoming','Zug zum Ziel',1,6,.1],['Übergang','morphSettle','Nachziehen am Ende',0,6,.1],
  ['Textgitter','gridSpacing','Abstand',.1,.4,.01],['Textgitter','gridStiffness','Schwingung',30,600,5],['Textgitter','gridDamping','Dämpfung',.3,6,.1],['Textgitter','gridScroll','Scrollen',0,4,.1],
+ ['Textgitter Unterseiten','pagePull','Mitziehen',0,1,.01],['Textgitter Unterseiten','pageSnap','Loslassen nach (Saitenabstände)',.1,1.4,.05],['Textgitter Unterseiten','pageStiffness','Schwingung',30,600,5],['Textgitter Unterseiten','pageDamping','Dämpfung',.3,20,.1],['Textgitter Unterseiten','pageScroll','Scrollen',0,4,.05],['Textgitter Unterseiten','pageScrollMax','Scrollen höchstens (Saitenabstände)',0,1.2,.01],
  ['Darstellung','dropShrink','Tropfen in Bewegung',.3,1,.01],
  ['Übergang','latticePerStroke','Raster je Strichstärke',.3,1.5,.05],['Übergang','latticeMin','Feinstes Raster',.5,3,.05],['Übergang','latticeMax','Gröbstes Raster',2,10,.1],['Übergang','calmFrom','Beruhigung ab (Anteil)',.3,1,.01],['Übergang','calmTo','Beruhigung bis (Anteil)',.4,1,.01],['Übergang','dropScale','Tropfengröße',.5,1.5,.05],['Übergang','sizeLead','Größenwechsel',.1,1,.05],['Übergang','flightParticles','Partikel im Flug',2000,40000,500],['Übergang','morphDrag','Dämpfung im Flug',0,40,.5],['Darstellung','flightReach','Reichweite im Flug',.3,1.5,.01],['Darstellung','flightDensity','Dichte im Flug',.2,2,.01],
 ];
@@ -784,13 +791,18 @@ if(tuning){loadTune();buildTune();}else{$('tuneToggle')?.remove();$('tune')?.rem
 // it, so when a string swings the text swings with it. Crossing a string
 // with the pointer grabs it; it follows until it snaps free and swings out.
 // Scrolling plucks the strings in view, a tap on empty space plucks the
-// nearest one. Nothing of the grid itself is drawn.
+// nearest one. Nothing of the grid itself is drawn. The home page swings
+// freely; the sub pages, where text is read, only ripple gently, and their
+// links and buttons stay put so they are easy to hit.
 const SPLIT='.panel, .tagline, .hint';
-const grid={lines:[],letters:[],spacing:70,oy:0,width:0,height:0,raf:0,then:0,timer:0,ptr:{x:NaN,y:NaN},tap:null};
+const grid={lines:[],letters:[],spacing:70,oy:0,width:0,height:0,raf:0,then:0,timer:0,rest:0,ptr:{x:NaN,y:NaN},tap:null};
 const gridOn=()=>!reducedMotion.matches;
 function splitText(root){
  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),nodes=[];
- for(let node=walker.nextNode();node;node=walker.nextNode())if(node.data.trim()&&!node.parentElement.closest('.gc, .line'))nodes.push(node);
+ for(let node=walker.nextNode();node;node=walker.nextNode()){
+  const el=node.parentElement;
+  if(node.data.trim()&&!el.closest('.gc, .line')&&!el.closest('.panel a, .panel button'))nodes.push(node);
+ }
  for(const node of nodes){
   const frag=document.createDocumentFragment();
   for(const part of node.data.split(/(\s+)/)){
@@ -834,32 +846,39 @@ function gridLetters(all=false){
   if(Math.abs(dy-L.dy)>.05){L.dy=dy;L.el.style.transform=dy?`translateY(${dy.toFixed(2)}px)`:'';}
  }
 }
+// How the strings feel: free on the home page, calm on the sub pages.
+function gridFeel(){
+ return isHome()?{stiffness:tune.gridStiffness,damping:tune.gridDamping,pull:1,snap:1,scroll:tune.gridScroll,scrollMax:1.2,tap:2.4}
+  :{stiffness:tune.pageStiffness,damping:tune.pageDamping,pull:tune.pagePull,snap:tune.pageSnap,scroll:tune.pageScroll,scrollMax:tune.pageScrollMax,tap:2.4*tune.pagePull};
+}
 function gridTick(t){
  const dt=grid.then?Math.min(1/30,(t-grid.then)/1000):1/60;grid.then=t;
- let busy=false;
+ const feel=gridFeel();let busy=false;
  for(const l of grid.lines){
   if(l.grabbed){busy=true;continue;}
   if(!l.offset&&!l.velocity)continue;
-  l.velocity+=-tune.gridStiffness*l.offset*dt;l.velocity*=Math.exp(-tune.gridDamping*dt);l.offset+=l.velocity*dt;
+  l.velocity+=-feel.stiffness*l.offset*dt;l.velocity*=Math.exp(-feel.damping*dt);l.offset+=l.velocity*dt;
   if(Math.abs(l.offset)<.1&&Math.abs(l.velocity)<2)l.offset=l.velocity=0;else busy=true;
  }
  gridLetters(!busy);
  if(busy)grid.raf=requestAnimationFrame(gridTick);else{grid.raf=0;grid.then=0;}
 }
 function gridKick(){if(!grid.raf)grid.raf=requestAnimationFrame(gridTick);}
-const gridSnap=type=>type==='mouse'?grid.spacing*1.4:grid.spacing*1.1;
-function gridPointer(x,y,snap){
+const gridSnap=type=>(type==='mouse'?grid.spacing*1.4:grid.spacing*1.1)*gridFeel().snap;
+function gridPointer(x,y,type){
  const px=grid.ptr.x,py=grid.ptr.y;grid.ptr.x=x;grid.ptr.y=y;
  if(px!==px)return;
- let touched=false;
+ const snap=gridSnap(type),follow=gridFeel().pull;let touched=false;
  for(const l of grid.lines){
   if(!l.grabbed&&(py-l.pos)*(y-l.pos)<=0&&py!==y){l.grabbed=true;l.velocity=0;}
   if(!l.grabbed)continue;
   const pull=y-l.pos;l.at=Math.max(0,Math.min(1,x/Math.max(1,grid.width)));
-  if(Math.abs(pull)>snap){gridLet(l);if(snap!==grid.spacing*1.4)try{navigator.vibrate?.(6);}catch{/* optional */}continue;}
-  l.offset=pull;touched=true;
+  if(Math.abs(pull)>snap){gridLet(l);if(type!=='mouse')try{navigator.vibrate?.(6);}catch{/* optional */}continue;}
+  l.offset=pull*follow;touched=true;
  }
  if(touched)gridKick();
+ // On a sub page a resting pointer lets go, so no line stays bent while reading.
+ clearTimeout(grid.rest);if(touched&&!isHome())grid.rest=setTimeout(gridRelease,250);
 }
 function gridLet(l){l.grabbed=false;if(Math.abs(l.offset)<.75)l.offset=0;gridKick();}
 function gridRelease(){grid.ptr.x=grid.ptr.y=NaN;for(const l of grid.lines)if(l.grabbed)gridLet(l);}
@@ -873,7 +892,13 @@ function gridReset(){
  grid.ptr.x=grid.ptr.y=NaN;
 }
 if(gridOn()){
- window.addEventListener('pointermove',e=>{if(e.target?.closest?.('.tune, .tune-toggle, dialog'))return;gridPointer(e.pageX,e.pageY,gridSnap(e.pointerType));},{passive:true});
+ window.addEventListener('pointermove',e=>{
+  if(e.target?.closest?.('.tune, .tune-toggle, dialog'))return;
+  // Over a link or button of a sub page the text lets go and calms down,
+  // so what is about to be clicked stands still.
+  if(e.target?.closest?.('.panel a, .panel button')){gridRelease();return;}
+  gridPointer(e.pageX,e.pageY,e.pointerType);
+ },{passive:true});
  window.addEventListener('pointerdown',e=>{grid.tap=e.pointerType!=='mouse'&&!e.target.closest('button, a, input, .tune')?{x:e.pageX,y:e.pageY,t:performance.now()}:null;},{passive:true});
  window.addEventListener('pointerup',e=>{
   if(e.pointerType!=='mouse')gridRelease();
@@ -881,7 +906,7 @@ if(gridOn()){
   const tap=grid.tap;grid.tap=null;
   if(tap&&Math.hypot(e.pageX-tap.x,e.pageY-tap.y)<10&&performance.now()-tap.t<350){
    const l=grid.lines[Math.round((e.pageY-grid.oy)/grid.spacing)];
-   if(l){let pull=e.pageY-l.pos;if(Math.abs(pull)<grid.spacing*.25)pull=grid.spacing*.5*(pull<0?-1:1);gridFlick(l,e.pageX,pull*2.4);}
+   if(l){let pull=e.pageY-l.pos;if(Math.abs(pull)<grid.spacing*.25)pull=grid.spacing*.5*(pull<0?-1:1);gridFlick(l,e.pageX,pull*gridFeel().tap);}
   }
  },{passive:true});
  window.addEventListener('pointercancel',gridRelease,{passive:true});
@@ -892,11 +917,11 @@ if(gridOn()){
   grid.ptr.x=grid.ptr.y=NaN;
   const now=performance.now(),v=(scrollY-lastScroll)/Math.max(8,now-lastScrollT)*16;lastScroll=scrollY;lastScrollT=now;
   if(Math.abs(v)<1.5)return;
-  const cap=grid.spacing*1.2,top=scrollY-grid.spacing,bottom=scrollY+innerHeight+grid.spacing;
+  const feel=gridFeel(),cap=grid.spacing*feel.scrollMax,top=scrollY-grid.spacing,bottom=scrollY+innerHeight+grid.spacing;
   for(const l of grid.lines){
    if(l.pos<top||l.pos>bottom)continue;
    const vary=.75+.25*Math.sin(l.pos*.05);
-   gridFlick(l,grid.width*(.5+.3*Math.sin(l.pos*.013)),Math.max(-cap,Math.min(cap,v*tune.gridScroll))*vary);
+   gridFlick(l,grid.width*(.5+.3*Math.sin(l.pos*.013)),Math.max(-cap,Math.min(cap,v*feel.scroll))*vary);
   }
  },{passive:true});
  window.addEventListener('resize',scheduleGrid,{passive:true});
