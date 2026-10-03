@@ -283,9 +283,13 @@ class FluidRenderer {
  }
  // dropSpacing sets the drawn drop size, or fluid.dropSize sets it per
  // particle (a Float32Array); the physics keeps fluid.spacing either way.
+ // `extra` (optional) holds solid drops [{x,y,r}] in CSS px of the canvas,
+ // drawn as free liquid with the rest so they melt into it, for example the
+ // pointer's drop; r is the radius a lone drop shows.
  draw(fluid,dropSpacing=fluid.spacing){
   const gl=this.gl;if(gl.isContextLost())return;
-  if(this.data.length!==fluid.n*6)this.data=new Float32Array(fluid.n*6);
+  const extra=this.extra||[],total=fluid.n+extra.length;
+  if(this.data.length<total*6)this.data=new Float32Array(total*6);
   const sizes=fluid.dropSize,stir=1-Math.max(0,Math.min(1,this.calm));
   for(let i=0;i<fluid.n;i++){
    const k=i*6;this.data[k]=fluid.x[i];this.data[k+1]=fluid.y[i];this.data[k+2]=fluid.tx[i];this.data[k+3]=fluid.ty[i];
@@ -298,13 +302,16 @@ class FluidRenderer {
    this.data[k+4]=Math.sqrt(dx*dx+dy*dy)/(unit*(3-2*stir))+Math.sqrt(vx*vx+vy*vy)/(unit*12)*stir;
    this.data[k+5]=size;
   }
+  // Extra drops look fully liquid (deformation 1); a lone drop's surface lies
+  // at 0.87 of its size.
+  for(let j=0;j<extra.length;j++){const k=(fluid.n+j)*6,e=extra[j];this.data[k]=this.data[k+2]=e.x;this.data[k+1]=this.data[k+3]=e.y;this.data[k+4]=1;this.data[k+5]=e.r/.87;}
   gl.viewport(0,0,this.canvas.width,this.canvas.height);
   gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbo);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
-  gl.useProgram(this.points);gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,this.data,gl.DYNAMIC_DRAW);
+  gl.useProgram(this.points);gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,this.data.subarray(0,total*6),gl.DYNAMIC_DRAW);
   const at=this.at;
   gl.uniform2f(at.resolution,this.w,this.h);gl.uniform1f(at.pointScale,4.2*this.scale);gl.uniform1f(at.maxPoint,this.maxPointSize);
   gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.uniform1i(at.glyphMaterial,1);gl.uniform2f(at.pixelScale,this.canvas.width/this.w,this.canvas.height/this.h);gl.uniform1f(at.shrink,this.dropShrink);gl.uniform3f(at.fine,this.fine.from,Math.max(this.fine.to,this.fine.from+.001),this.fine.grow);gl.uniform1f(at.fineAmp,this.fine.amp);
-  gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE);gl.drawArrays(gl.POINTS,0,fluid.n);gl.disable(gl.BLEND);
+  gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE);gl.drawArrays(gl.POINTS,0,total);gl.disable(gl.BLEND);
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.useProgram(this.surface);gl.bindVertexArray(null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.texture);
   const sat=this.surfaceAt;
   gl.uniform1i(sat.density,0);gl.uniform2f(sat.texel,1/this.canvas.width,1/this.canvas.height);gl.uniform3fv(sat.paper,this.paper);gl.uniform3fv(sat.ink,this.ink);gl.drawArrays(gl.TRIANGLES,0,3);

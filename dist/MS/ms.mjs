@@ -1,11 +1,12 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=0a109179';
-import {FluidRenderer} from '../render.mjs?v=0a109179';
-import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=0a109179';
-import {matchPoints} from './match.mjs?v=0a109179';
-import {restrain,sagWeight} from './coupling.mjs?v=0a109179';
-import {createQuality} from '../quality.mjs?v=0a109179';
-import {Upright} from './sensors.mjs?v=0a109179';
+import {Fluid} from '../physics.mjs?v=85d27f1c';
+import {FluidRenderer} from '../render.mjs?v=85d27f1c';
+import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=85d27f1c';
+import {matchPoints} from './match.mjs?v=85d27f1c';
+import {restrain,sagWeight} from './coupling.mjs?v=85d27f1c';
+import {createQuality} from '../quality.mjs?v=85d27f1c';
+import {Upright} from './sensors.mjs?v=85d27f1c';
+import {DropChain,DropOutline} from './cursor.mjs?v=85d27f1c';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),back=$('back'),crumb=$('crumb'),hint=$('hint'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -70,11 +71,21 @@ const defaults={
  // Extra damping in flight (1/s): without neighbour friction the drops
  // would otherwise swing past their targets.
  morphDrag:26,
+ // The pointer's liquid drop: cursorDrops drops on springs behind the
+ // pointer (cursorFollow stiffness, cursorWobble velocity kept per step),
+ // radius cursorSize × letter size and cursorRest of that while still,
+ // cursorDecay how slowly it shrinks back, cursorTaper how much smaller the
+ // tail is, cursorMerge how far the drops melt into one outline of cursorLine px.
+ cursorSize:.08,cursorRest:.05,cursorDrops:6,cursorFollow:.15,cursorWobble:.4,cursorDecay:.995,cursorTaper:.7,cursorMerge:3,cursorLine:1,
+ // Melting into the letters: begins meltReach drop radii away, complete
+ // meltOverlap radii inside; how fast it melts in and drains out; size of
+ // the bridge drops toward the letter.
+ meltReach:4,meltOverlap:1.5,meltIn:.33,meltOut:.33,meltBridge:1,
 };
 const tune={...defaults};
 const CALM_SPEED=25,LINE_LOAD_MAX=600,LINE_KICK_MAX=400;
 let renderer=null,fluid=null,w=0,h=0,last=0,accumulator=0,layoutKey='',rebuildTimer=0;
-let idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null,homeLine=null,lineLoad=0,lineKick=0;
+let letterInk=[],idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null,homeLine=null,lineLoad=0,lineKick=0;
 let holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+tune.dripMin,liquidArea=null,magnetOn=false,letterSize=200;
 // A settling phase blends extra parameters in for a moment and fades them
 // out toward the end, e.g. thin flow while the letters assemble or a
@@ -163,6 +174,8 @@ function rebuild(force=false){
  for(const p of points){if(p.x<x0)x0=p.x;if(p.x>x1)x1=p.x;if(p.y<y0)y0=p.y;if(p.y>y1)y1=p.y;}
  liquidArea=points.length?{left:x0-reach,right:x1+reach,top:y0-reach,bottom:y1+reach}:null;
  letterSize=size;
+ // Ink box of each letter (canvas px), for the pointer's drop to melt into.
+ letterInk=layout.map(l=>{let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(const p of points)if(p.x>=l.x&&p.x<=l.x+l.width){x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);y0=Math.min(y0,p.y);y1=Math.max(y1,p.y);}return x1>=x0?{left:x0,right:x1,top:y0,bottom:y1}:null;}).filter(Boolean);
  ghost=null;draw();
 }
 function fitCanvas(){
@@ -228,6 +241,8 @@ function draw(){
  renderer.dropShrink=tune.dropShrink;renderer.fine=transition?{from:1e4,to:1e4+1,grow:tune.flightReach/coarse,amp:tune.flightDensity*coarse*coarse}:{from:0,to:0,grow:1,amp:1};
  // Toward the end of a flight the liquid settles into crisp type on cue.
  renderer.calm=flightCalm();
+ // The pointer's drop melting into the letters is drawn with the liquid.
+ renderer.extra=isHome()&&!transition?cursorSolid:null;
  renderer.draw(fluid);
 }
 function local(e){const r=canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
@@ -293,6 +308,7 @@ function frame(t){
  // The home line runs on the same clock as the liquid, so both can push each other.
  if(isHome()){homeLine?.step(dt,Math.min(LINE_LOAD_MAX,lineLoad)*tune.lineLoadGain,lineKick);lineKick=0;}
  if(!fluid||!renderer)return;
+ cursorSync(t);
  settleMotion(t);
  accumulator=Math.min(cap,accumulator+dt);
  if(transition){
@@ -322,7 +338,7 @@ function frame(t){
 }
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();renderer=null;fluid=null;home.classList.add('no-liquid');});
 canvas.addEventListener('webglcontextrestored',()=>{createRenderer();rebuild(true);});
-darkScheme.addEventListener('change',()=>{const c=colors();renderer?.setColors(c.paper,c.ink);draw();});
+darkScheme.addEventListener('change',()=>{const c=colors();renderer?.setColors(c.paper,c.ink);cursorInk=c.ink;draw();});
 new ResizeObserver(scheduleRebuild).observe(document.getElementById('views'));
 new ResizeObserver(scheduleRebuild).observe(initials);
 document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;release({pointerId:pointer.id});resetMotion();quality?.reset();});
@@ -345,7 +361,7 @@ const relearnUpright=()=>{upright.forget();motion.since=0;};
 screen.orientation?.addEventListener?.('change',relearnUpright);window.addEventListener('orientationchange',relearnUpright);
 const debug=new URLSearchParams(location.search).has('debug')?Object.assign(document.body.appendChild(document.createElement('pre')),{className:'debug'}):null;
 // With ?debug the running simulation is reachable from the console for tuning.
-if(debug)window.liquidType={get fluid(){return fluid;},get drip(){return drip;},get parameters(){return parameters;},get motion(){return motion;},get renderer(){return renderer;},get transition(){return transition;},get quality(){return quality;}};
+if(debug)window.liquidType={get fluid(){return fluid;},get drip(){return drip;},get parameters(){return parameters;},get motion(){return motion;},get renderer(){return renderer;},get transition(){return transition;},get quality(){return quality;},get cursor(){return chain;}};
 // Device reading to the direction the liquid moves on the canvas (x right,
 // y down): opposite to the device's own acceleration, aligned with the screen.
 const liquidDirection=(x,y)=>upright.direction(x,y,screenAngle());
@@ -397,6 +413,59 @@ if(motionPossible){
  // Android delivers without asking; the button disappears as soon as data arrives.
  if(typeof DeviceMotionEvent.requestPermission!=='function')startMotion();
 }else if(debug)debug.textContent=`kein sensor: touch ${touchDevice} · api ${'DeviceMotionEvent' in window} · reduzierte bewegung ${reducedMotion.matches}`;
+
+// ---------------------------------------------------------------- cursor ---
+// The pointer's liquid drop (see cursor.mjs): an outline that follows the
+// pointer everywhere and, near the liquid letters, melts into them as solid
+// ink drawn with the liquid itself, so it truly flows together with M and S.
+const coarsePointer=matchMedia('(pointer: coarse)').matches;
+const chain=new DropChain(),cursorCanvas=document.createElement('canvas');
+let cursorOutline=null,cursorRaf=0,cursorThen=0,cursorSolid=[],cursorLetters=null,cursorInk=colors().ink;
+try{cursorCanvas.className='cursor-drop';cursorCanvas.setAttribute('aria-hidden','true');cursorOutline=new DropOutline(cursorCanvas);document.body.append(cursorCanvas);}catch{cursorOutline=null;}
+function cursorFit(){if(cursorOutline){const w=document.documentElement.clientWidth,h=innerHeight;cursorCanvas.style.width=w+'px';cursorCanvas.style.height=h+'px';cursorOutline.resize(w,h,Math.min(2,devicePixelRatio||1));}}
+function cursorTick(t){
+ cursorRaf=0;
+ const dt=cursorThen?Math.min(.1,(t-cursorThen)/1000):1/60;cursorThen=t;
+ Object.assign(chain.o,{count:tune.cursorDrops,follow:tune.cursorFollow,wobble:tune.cursorWobble,rest:tune.cursorRest,decay:tune.cursorDecay,taper:tune.cursorTaper,reach:tune.meltReach,overlap:tune.meltOverlap,meltIn:tune.meltIn,meltOut:tune.meltOut});
+ // A finger covers small drops: on touch screens they stay bigger.
+ const R=Math.max(coarsePointer?34:18,letterSize*tune.cursorSize);
+ // Nearest point of the liquid letters, in viewport px; only while they are on show.
+ const letters=cursorLetters=cursorTarget(),box=letters?canvas.getBoundingClientRect():null;
+ const near=letters?(x,y)=>{
+  const cx=x-box.left,cy=y-box.top;let best=null;
+  for(const r of letters){const nx=Math.min(r.right,Math.max(r.left,cx)),ny=Math.min(r.bottom,Math.max(r.top,cy)),d=Math.hypot(cx-nx,cy-ny);if(!best||d<best.d)best={d,x:nx+box.left,y:ny+box.top};}
+  return best;
+ }:null;
+ const alive=chain.advance(dt,near,R),{outline,solid,scale}=chain.shape(R,tune.meltBridge);
+ cursorOutline.draw(outline,R*scale*tune.cursorMerge,tune.cursorLine,cursorInk);
+ cursorSolid=box?solid.map(d=>({x:d.x-box.left,y:d.y-box.top,r:d.r})):[];
+ if(alive)cursorRaf=requestAnimationFrame(cursorTick);
+ else{cursorThen=0;if(!chain.ptr.on){cursorOutline.clear();cursorSolid=[];}}
+}
+// The letters the drop may melt into: only while they are on show.
+function cursorTarget(){return isHome()&&!transition&&fluid&&letterInk.length?letterInk:null;}
+// Called by the liquid's frame before it draws: steps the drop first, so the
+// part melting into the letters shows in the same frame as its outline, and
+// wakes a resting drop when those letters come, go or change.
+function cursorSync(t){
+ if(!cursorRaf&&chain.ptr.on&&cursorLetters!==cursorTarget())cursorKick();
+ if(cursorRaf){cancelAnimationFrame(cursorRaf);cursorTick(t);}
+}
+function cursorKick(){if(cursorOutline&&!reducedMotion.matches&&!cursorRaf)cursorRaf=requestAnimationFrame(cursorTick);}
+function cursorAt(x,y){chain.point(x,y);cursorKick();}
+function cursorAway(){chain.leave();cursorKick();}
+if(cursorOutline){
+ // A new canvas size clears the outline, so it is drawn again.
+ cursorFit();window.addEventListener('resize',()=>{cursorFit();cursorKick();},{passive:true});
+ window.addEventListener('pointermove',e=>cursorAt(e.clientX,e.clientY),{passive:true});
+ window.addEventListener('pointerdown',e=>cursorAt(e.clientX,e.clientY),{passive:true});
+ document.documentElement.addEventListener('pointerleave',cursorAway,{passive:true});
+ window.addEventListener('blur',cursorAway,{passive:true});
+ // While the page scrolls under a finger, pointer events stop but touch events go on.
+ window.addEventListener('touchmove',e=>{const t=e.touches[0];if(t)cursorAt(t.clientX,t.clientY);},{passive:true});
+ const touchEnd=e=>{if(!e.touches.length)cursorAway();};
+ window.addEventListener('touchend',touchEnd,{passive:true});window.addEventListener('touchcancel',touchEnd,{passive:true});
+}
 
 // ------------------------------------------------------------ navigation ---
 const views=new Map([...document.querySelectorAll('.view')].map(v=>[v.dataset.view,v]));
@@ -651,6 +720,8 @@ const TUNE=[
  ['Halten und Platzen','holdMs','Haltedauer (ms)',150,1500,10],['Halten und Platzen','burstSpeed','Stärke',200,2000,10],['Halten und Platzen','burstFreeMs','Freiflug (ms)',0,800,10],
  ['Tropfen','dripMin','Pause mindestens (ms)',1000,20000,100],['Tropfen','dripMax','Pause höchstens (ms)',1000,30000,100],['Tropfen','dripFallMs','Fallzeit (ms)',200,4000,50],['Tropfen','dripSize','Größe',1,4,.1],['Tropfen','dripGravity','Schwerkraft',200,3000,10,parameters],
  ['Magnet','magnetStrength','Stärke',0,6,.1],['Magnet','magnetRadius','Radius',.1,.6,.01],
+ ['Cursor','cursorSize','Größe',.02,.2,.005],['Cursor','cursorRest','Größe in Ruhe',0,1,.01],['Cursor','cursorDrops','Tropfen',1,12,1],['Cursor','cursorFollow','Federung',.02,.6,.01],['Cursor','cursorWobble','Nachschwingen',.1,.9,.01],['Cursor','cursorDecay','Langsam schrumpfen',.95,.999,.001],['Cursor','cursorTaper','Verjüngung',0,1,.01],['Cursor','cursorMerge','Verschmelzen',.5,6,.1],['Cursor','cursorLine','Linienstärke (px)',.5,3,.1],
+ ['Cursor','meltReach','Verschmelzen ab (Radien)',0,8,.1],['Cursor','meltOverlap','Ganz verschmolzen bei (Radien)',0,4,.1],['Cursor','meltIn','Einfließen',.02,1,.01],['Cursor','meltOut','Ausfließen',.02,1,.01],['Cursor','meltBridge','Brücke',0,2,.05],
  ['Linie','lineLoadGain','Last',0,150,1],['Linie','lineImpactGain','Aufprall',0,.15,.005],
  ['Ruhebewegung','idleDelay','Verzögerung (ms)',1000,15000,100],['Ruhebewegung','idleForce','Kraft',0,4,.1],
  ['Sensoren','shakeGain','Schütteln',0,2000,10],['Sensoren','tiltGain','Kippen',0,300,1],['Sensoren','leanGain','Neigen (Schwerkraft)',0,500,5],
