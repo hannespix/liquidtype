@@ -55,7 +55,13 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .initials{margin:0;display:flex;justify-content:center;gap:.1em;font:700 clamp(7rem,40vw,22rem)/.82 var(--serif);touch-action:none;-webkit-user-select:none;user-select:none}
 .initial{display:block;font:inherit;line-height:inherit;color:transparent;cursor:pointer}
 .no-liquid .initial{color:var(--ink)}
-.initial:focus-visible{outline-offset:2px}
+/* Keyboard focus on a letter: a fine line under it instead of a box around
+   its invisible button. Focus the page moves itself (back at the start, e.g.
+   after Escape) shows no mark until the next keyboard step. */
+.initial{position:relative}
+.initial:focus-visible{outline:none}
+.initial:focus-visible::after{content:"";position:absolute;left:15%;right:15%;top:calc(50% + .4em);height:2px;border-radius:1px;background:var(--ink)}
+.initial[data-quiet-focus]:focus-visible::after{display:none}
 .tagline-wrap{position:relative;margin:1.5rem auto 0;max-width:100%}
 .tagline{position:relative;z-index:2;margin:0;display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:.55rem .85rem;font-size:clamp(1.05rem,2.6vw,1.45rem);letter-spacing:.06em}
 .tagline .link{border-bottom:0}

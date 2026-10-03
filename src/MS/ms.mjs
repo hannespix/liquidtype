@@ -620,7 +620,14 @@ function plainShow(name,focus){
   requestAnimationFrame(()=>{if(entry?.shape)arriveFrom(entry);else{rebuild();scatter();}});
  }
  scheduleGrid();
- if(focus)(name==='home'?letters[0]:views.get(name).querySelector('h2'))?.focus({preventScroll:true});
+ if(focus){if(name==='home')quietFocus(letters[0]);else views.get(name).querySelector('h2')?.focus({preventScroll:true});}
+}
+// Focus the page moves itself shows no focus mark (keyboard users still land
+// on the letter); the mark returns with the next keyboard step.
+function quietFocus(el){
+ if(!el)return;
+ el.dataset.quietFocus='';el.addEventListener('blur',()=>{delete el.dataset.quietFocus;},{once:true});
+ el.focus({preventScroll:true});
 }
 function go(name){
  if(name===current)return;
