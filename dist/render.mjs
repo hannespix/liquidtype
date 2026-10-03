@@ -86,12 +86,18 @@ export class FluidRenderer {
  // grow 1 and amp 1 leave every drop as designed.
  // calm (0..1) ignores a drop's leftover speed for its look, e.g. at the end
  // of a page transition; 0 leaves motion visible.
- constructor(canvas,{paper=[.973,.973,.957],ink=[.016,.020,.019],dropShrink=1,fine={from:0,to:0,grow:1,amp:1},calm=0}={}){
-  this.paper=paper;this.ink=ink;this.dropShrink=dropShrink;this.fine=fine;this.calm=calm;
+ // maxScale caps the drawing resolution in device pixels per CSS pixel; a
+ // weak graphics chip draws far fewer pixels at 1 than at the usual 2.
+ constructor(canvas,{paper=[.973,.973,.957],ink=[.016,.020,.019],dropShrink=1,fine={from:0,to:0,grow:1,amp:1},calm=0,maxScale=2}={}){
+  this.paper=paper;this.ink=ink;this.dropShrink=dropShrink;this.fine=fine;this.calm=calm;this.maxScale=maxScale;
   const gl=canvas.getContext('webgl2',{alpha:false,antialias:false,powerPreference:'high-performance',depth:false,stencil:false});
   if(!gl)throw new Error('WebGL2 ist auf diesem Gerät nicht verfügbar.');
   this.gl=gl;this.canvas=canvas;this.floatSurface=!!gl.getExtension('EXT_color_buffer_float');
   this.points=this.program(vertex,drop);this.surface=this.program(screen,surface);
+  // Uniform locations are looked up once instead of on every frame.
+  const where=(program,names)=>Object.fromEntries(names.map(n=>[n,gl.getUniformLocation(program,n)]));
+  this.at=where(this.points,['resolution','pointScale','maxPoint','glyphMaterial','pixelScale','shrink','fine','fineAmp']);
+  this.surfaceAt=where(this.surface,['density','texel','paper','ink']);
   this.buffer=gl.createBuffer();this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
   for(const [name,size,offset] of [['position',2,0],['home',2,8],['deformation',1,16],['size',1,20]]){const loc=gl.getAttribLocation(this.points,name);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,size,gl.FLOAT,false,24,offset);}
   this.glyph=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4));
@@ -109,10 +115,12 @@ export class FluidRenderer {
   const gl=this.gl;gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);gl.activeTexture(gl.TEXTURE0);
  }
  resize(w,h){
-  const gl=this.gl;this.w=w;this.h=h;this.scale=Math.min(devicePixelRatio||1,2,2400/w);this.canvas.width=Math.round(w*this.scale);this.canvas.height=Math.round(h*this.scale);
+  const gl=this.gl;this.w=w;this.h=h;this.scale=Math.min(devicePixelRatio||1,this.maxScale,2,2400/w);this.canvas.width=Math.round(w*this.scale);this.canvas.height=Math.round(h*this.scale);
   gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texImage2D(gl.TEXTURE_2D,0,this.floatSurface?gl.RGBA16F:gl.RGBA8,this.canvas.width,this.canvas.height,0,gl.RGBA,this.floatSurface?gl.HALF_FLOAT:gl.UNSIGNED_BYTE,null);
   gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbo);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,this.texture,0);
-  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('Die Grafikoberfläche konnte nicht angelegt werden.');
+  // The completeness check stalls the graphics pipeline, so only the first
+  // surface is checked; later ones only change size, not format.
+  if(!this.checked){if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('Die Grafikoberfläche konnte nicht angelegt werden.');this.checked=true;}
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);
  }
  // dropSpacing sets the drawn drop size, or fluid.dropSize sets it per
@@ -128,17 +136,20 @@ export class FluidRenderer {
    // quiets leftover jitter and sub-pixel offsets; a drop still clearly away
    // from home keeps its liquid look, so it never draws the type shifted.
    const size=sizes?sizes[i]:dropSpacing,unit=sizes?Math.max(fluid.spacing,size):fluid.spacing;
-   this.data[k+4]=Math.hypot(fluid.x[i]-fluid.tx[i],fluid.y[i]-fluid.ty[i])/(unit*(3-2*stir))+Math.hypot(fluid.vx[i],fluid.vy[i])/(unit*12)*stir;
+   const dx=fluid.x[i]-fluid.tx[i],dy=fluid.y[i]-fluid.ty[i],vx=fluid.vx[i],vy=fluid.vy[i];
+   this.data[k+4]=Math.sqrt(dx*dx+dy*dy)/(unit*(3-2*stir))+Math.sqrt(vx*vx+vy*vy)/(unit*12)*stir;
    this.data[k+5]=size;
   }
   gl.viewport(0,0,this.canvas.width,this.canvas.height);
   gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbo);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
   gl.useProgram(this.points);gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,this.data,gl.DYNAMIC_DRAW);
-  gl.uniform2f(gl.getUniformLocation(this.points,'resolution'),this.w,this.h);gl.uniform1f(gl.getUniformLocation(this.points,'pointScale'),4.2*this.scale);gl.uniform1f(gl.getUniformLocation(this.points,'maxPoint'),this.maxPointSize);
-  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.uniform1i(gl.getUniformLocation(this.points,'glyphMaterial'),1);gl.uniform2f(gl.getUniformLocation(this.points,'pixelScale'),this.canvas.width/this.w,this.canvas.height/this.h);gl.uniform1f(gl.getUniformLocation(this.points,'shrink'),this.dropShrink);gl.uniform3f(gl.getUniformLocation(this.points,'fine'),this.fine.from,Math.max(this.fine.to,this.fine.from+.001),this.fine.grow);gl.uniform1f(gl.getUniformLocation(this.points,'fineAmp'),this.fine.amp);
+  const at=this.at;
+  gl.uniform2f(at.resolution,this.w,this.h);gl.uniform1f(at.pointScale,4.2*this.scale);gl.uniform1f(at.maxPoint,this.maxPointSize);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.glyph);gl.uniform1i(at.glyphMaterial,1);gl.uniform2f(at.pixelScale,this.canvas.width/this.w,this.canvas.height/this.h);gl.uniform1f(at.shrink,this.dropShrink);gl.uniform3f(at.fine,this.fine.from,Math.max(this.fine.to,this.fine.from+.001),this.fine.grow);gl.uniform1f(at.fineAmp,this.fine.amp);
   gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE);gl.drawArrays(gl.POINTS,0,fluid.n);gl.disable(gl.BLEND);
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.useProgram(this.surface);gl.bindVertexArray(null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.texture);
-  gl.uniform1i(gl.getUniformLocation(this.surface,'density'),0);gl.uniform2f(gl.getUniformLocation(this.surface,'texel'),1/this.canvas.width,1/this.canvas.height);gl.uniform3fv(gl.getUniformLocation(this.surface,'paper'),this.paper);gl.uniform3fv(gl.getUniformLocation(this.surface,'ink'),this.ink);gl.drawArrays(gl.TRIANGLES,0,3);
+  const sat=this.surfaceAt;
+  gl.uniform1i(sat.density,0);gl.uniform2f(sat.texel,1/this.canvas.width,1/this.canvas.height);gl.uniform3fv(sat.paper,this.paper);gl.uniform3fv(sat.ink,this.ink);gl.drawArrays(gl.TRIANGLES,0,3);
  }
 }
 

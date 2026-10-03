@@ -1,6 +1,7 @@
-import {Fluid} from './physics.mjs?v=80c0904d';
-import {FluidRenderer} from './render.mjs?v=80c0904d';
-import {sampleGlyphs} from './glyphs.mjs?v=80c0904d';
+import {Fluid} from './physics.mjs?v=1c24c9fa';
+import {FluidRenderer} from './render.mjs?v=1c24c9fa';
+import {sampleGlyphs} from './glyphs.mjs?v=1c24c9fa';
+import {createQuality} from './quality.mjs?v=1c24c9fa';
 const $=id=>document.getElementById(id);
 const canvas=$('fluid'),wrap=$('canvasWrap'),input=$('textInput'),cursor=$('cursor');
 // No alternate text layer: the only visible typography is the particle surface.
@@ -11,7 +12,7 @@ function disturb(x,y,dx,dy,radius){
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 const controls=['viscosity','tension','attraction','strength'];
 const parameters={viscosity:.35,tension:.65,attraction:.5,strength:1.3};
-let renderer=null,fluid=null,paused=reduced.matches,failed=false,w=0,h=0,last=0,accumulator=0,textTimer,resizeTimer;
+let renderer=null,fluid=null,paused=reduced.matches,failed=false,w=0,h=0,last=0,accumulator=0,textTimer,resizeTimer,quality=null;
 const pointer={x:-1000,y:-1000,down:false,radius:95,id:null,last:0};
 function updateStatus(){
  $('pause').setAttribute('aria-pressed',String(paused));$('pauseLabel').textContent=paused?'Fortsetzen':'Pause';$('pauseIcon').textContent=paused?'▶':'Ⅱ';
@@ -28,7 +29,7 @@ function maskPoints(text,width,height){
  let size=Math.min(height*.63,width*.7,330);ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
  const measured=ctx.measureText(text).width;size*=Math.min(1,width*.86/Math.max(1,measured));ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
  const m=ctx.measureText(text),font=ctx.font,baseline=height/2+(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2;
- const {points,spacing,material}=sampleGlyphs(width,height,g=>{g.font=font;g.textAlign='center';g.fillStyle='black';g.fillText(text,width/2,baseline);},width<700?2200:4200);
+ const {points,spacing,material}=sampleGlyphs(width,height,g=>{g.font=font;g.textAlign='center';g.fillStyle='black';g.fillText(text,width/2,baseline);},Math.round((width<700?2200:4200)*(quality?.particles??1)));
  renderer?.setMaterial(material);
  return {points,spacing};
 }
@@ -55,12 +56,20 @@ function showFailure(message){failed=true;canvas.style.visibility='hidden';$('fa
 function setup(){
  try{
   renderer=new FluidRenderer(canvas);failed=false;canvas.style.visibility='visible';$('fallback').hidden=true;
+  quality??=createQuality(renderer.gl,{floatSurface:renderer.floatSurface,onChange:applyQuality});renderer.maxScale=quality.resolution;
   resize();updateStatus();
  }catch(error){console.warn('Liquid Type graphics:',error);showFailure('Die interaktive Grafik ist gerade nicht verfügbar. Bitte versuche es mit aktivierter Hardwarebeschleunigung in einem aktuellen Browser.');}
 }
+// A slow device turned a quality dial down: draw fewer pixels, or rebuild
+// the text from fewer particles.
+function applyQuality({changed}){
+ if(!renderer||failed||!w||!h)return;
+ if(changed==='resolution'){renderer.maxScale=quality.resolution;renderer.resize(w,h);draw();}
+ else setText(input.value);
+}
 function resize(){
  const rect=wrap.getBoundingClientRect();const nw=Math.max(100,Math.round(rect.width)),nh=Math.max(160,Math.round(rect.height));
- if(nw===w&&nh===h&&fluid&&renderer?.w===w)return;w=nw;h=nh;pointer.radius=Math.max(60,Math.min(110,w*.13));
+ if(nw===w&&nh===h&&fluid&&renderer?.w===w)return;w=nw;h=nh;pointer.radius=Math.max(60,Math.min(110,w*.13));quality?.reset();
  if(renderer&&!failed)renderer.resize(w,h);setText(input.value,false);
 }
 input.addEventListener('input',()=>{clearTimeout(textTimer);$('charCount').textContent=Array.from(input.value).length+' / 32';textTimer=setTimeout(()=>setText(input.value),130);});
@@ -102,19 +111,23 @@ window.addEventListener('scroll',()=>{
  }
 },{passive:true});
 new ResizeObserver(()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{try{resize();}catch{showFailure('Die Grafik konnte nicht angepasst werden. Bitte lade die Ansicht neu.');}},100);}).observe(wrap);
-document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;pointer.down=false;pointer.id=null;cursor.classList.remove('dragging');});
+document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;pointer.down=false;pointer.id=null;cursor.classList.remove('dragging');quality?.reset();});
 reduced.addEventListener('change',e=>{if(e.matches)setPaused(true);});
 function frame(t){
  requestAnimationFrame(frame);
  if(document.hidden){last=0;return;}
- const dt=last?Math.min(.04,(t-last)/1000):0;last=t;
+ const interval=last?t-last:0,dt=Math.min(.04,interval/1000);last=t;
  if(paused||failed||!fluid)return;
- accumulator=Math.min(.04,accumulator+dt);
+ // With fewer particles chosen for a slow processor, a late frame no longer
+ // catches up the full time: the liquid briefly slows instead of stuttering.
+ const work=performance.now(),cap=(quality?.level.part??0)>=2?1/40:.04;
+ accumulator=Math.min(cap,accumulator+dt);
  while(accumulator>=1/120){
   const tick=1/120;
   fluid.step(tick,parameters,pointer);accumulator-=tick;
  }
  draw();
+ quality?.frame(interval,performance.now()-work);
 }
 setup();updateStatus();requestAnimationFrame(frame);
 // Expose the same visible controls to compatible browsers; no network or storage.

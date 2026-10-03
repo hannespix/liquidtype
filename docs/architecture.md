@@ -38,6 +38,14 @@ Bewegungssensoren wirken nur über Änderungen: Die lineare Beschleunigung wird 
 
 Wenn `EXT_color_buffer_float` verfügbar ist, verwendet die Summentextur RGBA16F; andernfalls RGBA8. Die Schrift wird ausschließlich über denselben Partikel-Renderpfad ausgegeben. Die Materialmaske wird nicht als separate Schriftebene angezeigt.
 
+## Schwache und ältere Geräte
+
+`quality.mjs` führt auf beiden Seiten zwei Regler. Der eine begrenzt die Zeichenauflösung (2, 1,5, 1 oder 0,75 Gerätepixel je CSS-Pixel) und entlastet schwache Grafikchips. Der andere senkt den Anteil der Partikel (100, 80, 62 oder 48 Prozent) und entlastet schwache Prozessoren. Die Pixelzahl ist der stärkste Hebel, denn jeder Bildpunkt der Flüssigkeit wird von rund 14 Tropfen gezeichnet, unabhängig von ihrer Zahl. Weniger Partikel sparen dagegen Rechenzeit in der Physik.
+
+Den Startwert schätzt die Seite aus dem, was das Gerät meldet: Softwaredarstellung, höchstens zwei oder vier Kerne, höchstens 2 oder 4 GB Arbeitsspeicher und fehlende Float-Renderziele. Danach entscheidet die Bildrate. Liegt der Median der letzten 40 gezeichneten Bilder über 22 ms, dreht die Seite einen Regler eine Stufe herunter. Füllt die eigene Rechenzeit mehr als 55 Prozent des Bildes, ist es der Partikelregler, sonst die Auflösung. Die jeweils letzte Stufe gibt es nur unter 25 Bildern pro Sekunde. Gleichmäßige Bilder um 30 pro Sekunde mit wenig eigener Arbeit deuten auf einen gedrosselten Bildschirm hin, etwa im Stromsparmodus, und kosten höchstens eine Auflösungsstufe. Regler gehen innerhalb eines Besuchs nie wieder hoch; der erreichte Stand gilt per `sessionStorage` für den ganzen Besuch. Mit `?quality=0` (volle Qualität) bis `?quality=3` (niedrigste) sind beide Regler fest eingestellt, etwa für Vergleiche.
+
+Auf der MS-Seite sinkt das Partikelbudget der Seitenübergänge nur mit der Wurzel des Anteils, denn Flugtropfen rechnen ohne Nachbarkräfte und kosten nur einen Bruchteil. Bei wenigen Partikeln holt die Physik einen verspäteten Frame nicht mehr vollständig nach, sodass die Flüssigkeit kurz langsamer läuft, statt zu ruckeln. Unabhängig davon ist die Engine schlanker geworden. Die Nachbarschaftssuche nutzt sortierte Zellen und besucht jedes Paar nur einmal, was rund 1,7-mal schneller ist. Der Renderer schlägt Uniform-Adressen nur einmal nach und prüft das Framebuffer-Ziel nur beim ersten Anlegen. Die Abtastung eines Übergangs malt jede Schrift nur einmal. Das schwingende Textgitter bewegt nur Buchstaben in Bildschirmnähe und richtet den Rest erst aus, wenn alles ruht.
+
 ## Prüfstand
 
 - Automatisierte Tests prüfen endliche/beschränkte Zustände, Rückkehr zur Schrift, reziproke Reaktion, leere Eingabe im Physikkern, Reset und stabiles Gleichgewicht bei maximalen Reglern.

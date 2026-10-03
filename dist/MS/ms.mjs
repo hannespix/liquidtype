@@ -1,9 +1,10 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=80c0904d';
-import {FluidRenderer} from '../render.mjs?v=80c0904d';
-import {sampleGlyphs,glyphMaterial,glyphLattice} from '../glyphs.mjs?v=80c0904d';
-import {matchPoints} from './match.mjs?v=80c0904d';
-import {restrain,sagWeight} from './coupling.mjs?v=80c0904d';
+import {Fluid} from '../physics.mjs?v=1c24c9fa';
+import {FluidRenderer} from '../render.mjs?v=1c24c9fa';
+import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=1c24c9fa';
+import {matchPoints} from './match.mjs?v=1c24c9fa';
+import {restrain,sagWeight} from './coupling.mjs?v=1c24c9fa';
+import {createQuality} from '../quality.mjs?v=1c24c9fa';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -100,9 +101,22 @@ function cssColor(name){
 const colors=()=>({paper:cssColor('--paper')||[1,1,1],ink:cssColor('--ink')||[0,0,0]});
 
 // ---------------------------------------------------------------- liquid ---
+// Quality dials for slow and old devices (see quality.mjs): drawing
+// resolution and the share of particles, for the initials and for flights.
+let quality=null;
 function createRenderer(){
- try{renderer=new FluidRenderer(canvas,colors());w=h=0;home.classList.remove('no-liquid');}
+ try{
+  renderer=new FluidRenderer(canvas,colors());w=h=0;home.classList.remove('no-liquid');
+  quality??=createQuality(renderer.gl,{floatSurface:renderer.floatSurface,onChange:applyQuality});renderer.maxScale=quality.resolution;
+ }
  catch(error){console.warn('Liquid Type:',error);renderer=null;home.classList.add('no-liquid');}
+}
+// A slow device turned a dial down: draw fewer pixels at once, or rebuild
+// the initials from fewer particles (flights pick the new share up next time).
+function applyQuality({changed}){
+ if(!renderer)return;
+ if(changed==='resolution'){renderer.maxScale=quality.resolution;if(w&&h){renderer.resize(w,h);draw();}}
+ else if(isHome()&&!transition){layoutKey='';rebuild(true);}
 }
 // Where the (transparent) DOM letters sit, relative to the canvas.
 function glyphLayout(){
@@ -153,7 +167,7 @@ function fitCanvas(){
  if(nw!==w||nh!==h){w=nw;h=nh;renderer.resize(w,h);}
  return true;
 }
-const sampleInitials=layout=>sampleGlyphs(w,h,g=>paint(g,layout),w<700?2200:4200);
+const sampleInitials=layout=>sampleGlyphs(w,h,g=>paint(g,layout),Math.round((w<700?2200:4200)*(quality?.particles??1)));
 const clampX=v=>Math.max(fluid.spacing,Math.min(w-fluid.spacing,v));
 const clampY=v=>Math.max(fluid.spacing,Math.min(h-fluid.spacing,v));
 // The letters condense from scattered drops instead of simply appearing.
@@ -266,9 +280,12 @@ function frame(t){
  requestAnimationFrame(frame);
  if(document.hidden||(!isHome()&&!transition)){last=0;return;}
  // Flights are cheap (no neighbour forces) and must arrive on time, so they
- // may catch up more simulated time per frame on a slow device.
- const cap=transition?.1:.04;
- const dt=last?Math.min(cap,(t-last)/1000):0;last=t;
+ // may catch up more simulated time per frame on a slow device. With fewer
+ // particles chosen for a slow processor, the liquid at home no longer
+ // catches up a late frame in full: it briefly slows instead of stuttering.
+ const cap=transition?.1:(quality?.level.part??0)>=2?1/40:.04;
+ const interval=last?t-last:0,dt=Math.min(cap,interval/1000);last=t;
+ const work=performance.now();
  // The home line runs on the same clock as the liquid, so both can push each other.
  if(isHome()){homeLine?.step(dt,Math.min(LINE_LOAD_MAX,lineLoad)*tune.lineLoadGain,lineKick);lineKick=0;}
  if(!fluid||!renderer)return;
@@ -281,7 +298,7 @@ function frame(t){
   // stable, which halves the cost of the many fine drops.
   const flight={...parameters,viscosity:tune.morphViscosity,homing:tune.morphHoming*(1+tune.morphSettle*flightCalm()),solo:true,drag:tune.morphDrag};
   while(accumulator>=1/60){fluid.step(1/60,flight,null);accumulator-=1/60;}
-  blendSizes(t);draw();return;
+  blendSizes(t);draw();quality?.frame(interval,performance.now()-work);return;
  }
  idleMotion(t);effects(t);
  if(accumulator>=1/120){
@@ -297,13 +314,14 @@ function frame(t){
   }
  }
  draw();
+ quality?.frame(interval,performance.now()-work);
 }
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();renderer=null;fluid=null;home.classList.add('no-liquid');});
 canvas.addEventListener('webglcontextrestored',()=>{createRenderer();rebuild(true);});
 darkScheme.addEventListener('change',()=>{const c=colors();renderer?.setColors(c.paper,c.ink);draw();});
 new ResizeObserver(scheduleRebuild).observe(document.getElementById('views'));
 new ResizeObserver(scheduleRebuild).observe(initials);
-document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;release({pointerId:pointer.id});resetMotion();});
+document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;release({pointerId:pointer.id});resetMotion();quality?.reset();});
 
 // ----------------------------------------------------------------- motion ---
 // Phone sensors. Only changes count: a shake or a quick tilt sends the liquid
@@ -316,7 +334,7 @@ const LEAN_RELAX=2,NUDGE_LIMIT=260,SENSOR_TIMEOUT=300,SENSOR_WAIT=2500;
 const motion={active:false,gravity:null,pose:null,last:0,events:0,waiting:0};
 const debug=new URLSearchParams(location.search).has('debug')?Object.assign(document.body.appendChild(document.createElement('pre')),{className:'debug'}):null;
 // With ?debug the running simulation is reachable from the console for tuning.
-if(debug)window.liquidType={get fluid(){return fluid;},get drip(){return drip;},get parameters(){return parameters;},get motion(){return motion;},get renderer(){return renderer;},get transition(){return transition;}};
+if(debug)window.liquidType={get fluid(){return fluid;},get drip(){return drip;},get parameters(){return parameters;},get motion(){return motion;},get renderer(){return renderer;},get transition(){return transition;},get quality(){return quality;}};
 // Device frame (x right, y up in portrait) to canvas frame (x right, y down)
 // as the direction the liquid moves: opposite to the device's own acceleration.
 function liquidDirection(x,y){
@@ -426,20 +444,24 @@ function textShape(view){
 }
 const headingShape=textShape;
 const canvasOn=on=>{canvas.classList.toggle('is-off',!on);};
-const panelBudget=()=>Math.round(tune.flightParticles*(w<700?.5:1));
+// Flight drops skip neighbour forces and cost a fraction of a resting drop,
+// so a slow device gives up fewer of them (the root of its particle share).
+const panelBudget=()=>Math.round(tune.flightParticles*(w<700?.5:1)*Math.sqrt(quality?.particles??1));
 // A whole text as liquid: every font on its own lattice, sized from its
 // stroke width, so thin type gets fine drops and bold or large type fuller
 // ones. Returns the points, each point's lattice (its drop size), the
 // finest lattice and the material texture.
 function sampleText(shape,budget){
  const material=glyphMaterial(w,h,g=>shape.draw(g));
+ // Every font is painted once; a coarser second try only scans again.
+ const rasters=shape.groups.map(gr=>glyphRaster(w,h,g=>shape.draw(g,gr.key),{box:gr.box}));
  let scale=1,points=[],sizes=[];
  for(let attempt=0;attempt<3;attempt++){
   points=[];sizes=[];
-  for(const gr of shape.groups){
+  for(const raster of rasters){
    // Cells count by the pixel under their centre, so the liquid carries the
    // type's own weight; a third covered is enough to keep thin stems whole.
-   const lattice=glyphLattice(w,h,g=>shape.draw(g,gr.key),stroke=>Math.max(tune.latticeMin,Math.min(tune.latticeMax,stroke*tune.latticePerStroke))*scale,{box:gr.box,threshold:80,faithful:true});
+   const lattice=rasterLattice(raster,stroke=>Math.max(tune.latticeMin,Math.min(tune.latticeMax,stroke*tune.latticePerStroke))*scale,{threshold:80,faithful:true});
    for(const p of lattice.points){points.push(p);sizes.push(lattice.spacing);}
   }
   if(points.length<=budget)break;
@@ -697,9 +719,12 @@ function gridBuild(){
 }
 function scheduleGrid(){clearTimeout(grid.timer);grid.timer=setTimeout(gridBuild,80);}
 const lineOffset=(l,x)=>l?sagWeight(grid.width,l.at,x)*l.offset:0;
-function gridLetters(){
- const {lines,spacing,oy}=grid;
+// Only letters near the screen are moved while the strings swing; the last
+// pass, once all is still, settles every letter (`all`).
+function gridLetters(all=false){
+ const {lines,spacing,oy}=grid,top=scrollY-spacing,bottom=scrollY+innerHeight+spacing;
  for(const L of grid.letters){
+  if(!all&&(L.y<top||L.y>bottom))continue;
   const fy=(L.y-oy)/spacing,i=Math.floor(fy),k=fy-i;
   const dy=lineOffset(lines[i],L.x)*(1-k)+lineOffset(lines[i+1],L.x)*k;
   if(Math.abs(dy-L.dy)>.05){L.dy=dy;L.el.style.transform=dy?`translateY(${dy.toFixed(2)}px)`:'';}
@@ -714,7 +739,7 @@ function gridTick(t){
   l.velocity+=-tune.gridStiffness*l.offset*dt;l.velocity*=Math.exp(-tune.gridDamping*dt);l.offset+=l.velocity*dt;
   if(Math.abs(l.offset)<.1&&Math.abs(l.velocity)<2)l.offset=l.velocity=0;else busy=true;
  }
- gridLetters();
+ gridLetters(!busy);
  if(busy)grid.raf=requestAnimationFrame(gridTick);else{grid.raf=0;grid.then=0;}
 }
 function gridKick(){if(!grid.raf)grid.raf=requestAnimationFrame(gridTick);}

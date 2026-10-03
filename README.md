@@ -31,6 +31,7 @@ Der Build erzeugt die modularen Website-Dateien in `dist/` und die vollständige
 - `src/glyphs.mjs` – gemeinsame Abtastung von Schrift in Partikel und Materialtextur
 - `src/physics.mjs` – Partikelphysik und Gleichgewicht an der Schriftform
 - `src/render.mjs` – WebGL2-Oberflächenrekonstruktion mit einstellbaren Farben
+- `src/quality.mjs` – automatische Qualitätsstufen für schwache und ältere Geräte
 - `src/MS/` – Unterseite für Matthias Sütterlin mit flüssigen Initialen M und S
 - `src/404.html` – Fehlerseite, leitet `/ms/` in beliebiger Schreibweise auf `/MS/` um
 - `scripts/` – Build und lokaler Entwicklungsserver ohne Abhängigkeiten
@@ -38,6 +39,10 @@ Der Build erzeugt die modularen Website-Dateien in `dist/` und die vollständige
 - `docs/` – Architektur, Prüfstand und ursprünglicher Entwurf
 - `dist/` – fertige modulare Website für statisches Hosting
 - `Liquid-Type-Offline.html` – fertige Offline-Einzeldatei
+
+## Schwache und ältere Geräte
+
+Beide Seiten passen sich der Leistung des Geräts an. Sie schätzen beim Start, was das Gerät kann, und beobachten danach die Bildrate. Bleibt sie niedrig, sinkt zuerst die Zeichenauflösung oder die Zahl der Partikel, je nachdem, ob der Grafikchip oder der Prozessor bremst. Auf schnellen Geräten bleibt alles in voller Qualität. Mit `?quality=0` an der Adresse gilt immer volle Qualität, mit `?quality=3` die niedrigste.
 
 ## Repository und Veröffentlichung
 
