@@ -1,10 +1,10 @@
-import {Fluid} from './physics.mjs?v=83a1af66';
-import {FluidRenderer} from './render.mjs?v=83a1af66';
-import {sampleGlyphs} from './glyphs.mjs?v=83a1af66';
-import {createQuality} from './quality.mjs?v=83a1af66';
-import {MotionReader} from './sensors.mjs?v=83a1af66';
-import {LiquidCursor} from './cursor.mjs?v=83a1af66';
-import {scatterAround,burstFrom,isCalm,dripIndices,Settle,idleHand} from './effects.mjs?v=83a1af66';
+import {Fluid} from './physics.mjs?v=663bafa8';
+import {FluidRenderer} from './render.mjs?v=663bafa8';
+import {sampleGlyphs} from './glyphs.mjs?v=663bafa8';
+import {createQuality} from './quality.mjs?v=663bafa8';
+import {MotionReader} from './sensors.mjs?v=663bafa8';
+import {LiquidCursor} from './cursor.mjs?v=663bafa8';
+import {scatterAround,burstFrom,isCalm,dripIndices,Settle,idleHand} from './effects.mjs?v=663bafa8';
 const $=id=>document.getElementById(id);
 const canvas=$('fluid'),wrap=$('canvasWrap'),input=$('textInput'),cursor=$('cursor');
 // No alternate text layer: the only visible typography is the particle surface.

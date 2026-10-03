@@ -10,7 +10,10 @@ test('build emits a parseable fully offline document',()=>{
  assert.doesNotThrow(()=>new vm.Script(js));
  assert.ok(!/^\s*(import |export )/m.test(js));
  assert.ok(js.includes('function sampleGlyphs('),'shared glyph sampler is inlined');
- for(const m of html.matchAll(/(?:src|href)="([^"]+)"/g))assert.ok(m[1].startsWith('#')||m[1].startsWith('data:'),m[1]);
+ // Everything the page loads is inlined; plain links may lead to the live site.
+ for(const m of html.matchAll(/<(?:script|img|link|source|iframe)\b[^>]*?(?:src|href)="([^"]+)"/g))assert.ok(m[1].startsWith('data:'),m[1]);
+ for(const m of html.matchAll(/<a\b[^>]*?href="([^"]+)"/g))assert.ok(m[1].startsWith('#')||m[1].startsWith('https://hannespix.github.io/liquidtype/'),m[1]);
+ assert.ok(html.includes('href="https://hannespix.github.io/liquidtype/impressum/"'),'the offline file links the live imprint');
  for(const name of ['index.html','404.html','style.css','app.mjs','physics.mjs','render.mjs','glyphs.mjs','quality.mjs','sensors.mjs','cursor.mjs','effects.mjs'])assert.ok(fs.existsSync('dist/'+name),name);
 });
 test('the offline document declares every top-level name once',()=>{
@@ -21,6 +24,15 @@ test('the offline document declares every top-level name once',()=>{
  const twice=names.filter((n,i)=>names.indexOf(n)!==i);
  assert.deepEqual(twice,[]);
  assert.ok(names.includes('LiquidCursor')&&names.includes('MotionReader')&&names.includes('burstFrom'),'shared effect modules are inlined');
+});
+test('the imprint is built, linked from the main page and credits Matthias Sütterlin',()=>{
+ const html=fs.readFileSync('dist/impressum/index.html','utf8');
+ assert.match(html,/<h1>Impressum<\/h1>/);
+ assert.match(html,/Angaben gemäß § 5 DDG/);
+ assert.match(html,/Hannes Pix<br>Eisenbahnstraße 19<br>79241 Ihringen am Kaiserstuhl/);
+ assert.match(html,/nach Inspiration von Matthias Sütterlin entstanden und basiert teilweise auf seinen Ideen/);
+ assert.match(html,/href="https:\/\/github\.com\/matthiassuetterlin"/);
+ assert.match(fs.readFileSync('dist/index.html','utf8'),/href="\.\/impressum\/"/);
 });
 test('MS subpage is built with its font and licence',()=>{
  for(const name of ['index.html','style.css','ms.mjs','fonts/playfair-display-700-latin.woff2','fonts/OFL.txt'])assert.ok(fs.existsSync('dist/MS/'+name),name);
