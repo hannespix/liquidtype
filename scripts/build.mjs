@@ -5,7 +5,7 @@ import path from 'node:path';
 const modules=['physics.mjs','render.mjs','glyphs.mjs','quality.mjs','sensors.mjs','cursor.mjs','effects.mjs','app.mjs'];
 const files=['index.html','404.html','style.css',...modules];
 // Subpages are static folders that import the shared engine modules from ../
-const folders=['MS'];
+const folders=['MS','impressum'];
 
 async function walk(dir){const out=[];for(const entry of await readdir(dir,{withFileTypes:true})){const p=path.join(dir,entry.name);out.push(...entry.isDirectory()?await walk(p):[p]);}return out.sort();}
 // One version stamp per build, derived from every source file. Appended to
@@ -35,5 +35,7 @@ const script='(()=>{\n"use strict";\n'+parts.join('\n')+'\n})();\n';
 if(/<\/script/i.test(script)||/<\/style/i.test(css))throw new Error('Unsafe inline closing tag');
 html=html.replace('<link rel="stylesheet" href="./style.css">',()=>'<style>\n'+css+'\n</style>');
 html=html.replace('<script type="module" src="./app.mjs"></script>',()=>'<script>\n'+script+'</script>');
+// The single file has no neighbours: its links lead to the live site.
+html=html.replace('href="./impressum/"','href="https://hannespix.github.io/liquidtype/impressum/"');
 await writeFile('Liquid-Type-Offline.html',html);
 console.log(`Built dist/ (main page and ${folders.join(', ')}, version ${version}) and Liquid-Type-Offline.html (zero runtime dependencies).`);

@@ -37,6 +37,7 @@ Der Build erzeugt die modularen Website-Dateien in `dist/` und die vollständige
 - `src/sensors.mjs` – Bewegungssensoren: Ausrichtung je Gerät und was die Flüssigkeit davon spürt
 - `src/MS/` – Unterseite für Matthias Sütterlin mit flüssigen Initialen M und S
 - `src/404.html` – Fehlerseite, leitet `/ms/` in beliebiger Schreibweise auf `/MS/` um
+- `src/impressum/` – Impressum (Anbieterangaben und Hinweis, dass Liquid Type nach Inspiration von Matthias Sütterlin entstanden ist); verlinkt im Fußbereich der Hauptseite, aus der Offline-Datei auf die Live-Adresse
 - `scripts/` – Build und lokaler Entwicklungsserver ohne Abhängigkeiten
 - `tests/` – Physik-, Gleichgewichts- und Buildprüfungen
 - `docs/` – Architektur, Prüfstand und ursprünglicher Entwurf
@@ -66,6 +67,7 @@ Beide Seiten passen sich der Leistung des Geräts an. Sie schätzen beim Start, 
 - Quellcode: https://github.com/hannespix/liquidtype
 - Live-Version (GitHub Pages): https://hannespix.github.io/liquidtype/ – dort liegt auch die Offline-Datei unter `/Liquid-Type-Offline.html`.
 - MS-Seite: https://hannespix.github.io/liquidtype/MS/
+- Impressum: https://hannespix.github.io/liquidtype/impressum/
 
 Jede Änderung geht über einen Pull Request nach `main`. Ein Merge auf `main` startet den GitHub-Actions-Workflow `.github/workflows/pages.yml`, der Tests und Build ausführt und `dist/` samt Offline-Datei auf GitHub Pages veröffentlicht. Pull Requests werden nur getestet und gebaut. Die Arbeitsregeln für die Weiterentwicklung stehen in `CLAUDE.md`.
 

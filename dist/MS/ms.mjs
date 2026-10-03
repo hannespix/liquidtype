@@ -1,13 +1,13 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=83a1af66';
-import {FluidRenderer} from '../render.mjs?v=83a1af66';
-import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=83a1af66';
-import {matchPoints} from './match.mjs?v=83a1af66';
-import {restrain,sagWeight} from './coupling.mjs?v=83a1af66';
-import {createQuality} from '../quality.mjs?v=83a1af66';
-import {MotionReader} from '../sensors.mjs?v=83a1af66';
-import {LiquidCursor} from '../cursor.mjs?v=83a1af66';
-import {scatterAround,burstFrom,isCalm,dripIndices,Settle,idleHand} from '../effects.mjs?v=83a1af66';
+import {Fluid} from '../physics.mjs?v=663bafa8';
+import {FluidRenderer} from '../render.mjs?v=663bafa8';
+import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=663bafa8';
+import {matchPoints} from './match.mjs?v=663bafa8';
+import {restrain,sagWeight} from './coupling.mjs?v=663bafa8';
+import {createQuality} from '../quality.mjs?v=663bafa8';
+import {MotionReader} from '../sensors.mjs?v=663bafa8';
+import {LiquidCursor} from '../cursor.mjs?v=663bafa8';
+import {scatterAround,burstFrom,isCalm,dripIndices,Settle,idleHand} from '../effects.mjs?v=663bafa8';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),back=$('back'),crumb=$('crumb'),hint=$('hint'),hintText=$('hintText'),motionButton=$('motionButton');
