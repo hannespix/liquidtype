@@ -1,11 +1,11 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=73f33156';
-import {FluidRenderer} from '../render.mjs?v=73f33156';
-import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=73f33156';
-import {matchPoints} from './match.mjs?v=73f33156';
-import {restrain,sagWeight} from './coupling.mjs?v=73f33156';
-import {createQuality} from '../quality.mjs?v=73f33156';
-import {Upright} from './sensors.mjs?v=73f33156';
+import {Fluid} from '../physics.mjs?v=661453e8';
+import {FluidRenderer} from '../render.mjs?v=661453e8';
+import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=661453e8';
+import {matchPoints} from './match.mjs?v=661453e8';
+import {restrain,sagWeight} from './coupling.mjs?v=661453e8';
+import {createQuality} from '../quality.mjs?v=661453e8';
+import {Upright} from './sensors.mjs?v=661453e8';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -499,9 +499,12 @@ function unstage(view){view.hidden=true;view.classList.remove('is-active','is-ar
 function handOver(fromView,view,focus){
  const t={finish(){
   for(const id of t.timers)clearTimeout(id);
-  fromView.hidden=true;fromView.classList.remove('is-active','is-leaving');
+  fromView.hidden=true;fromView.classList.remove('is-active','is-leaving','is-handed');
+  // The page is already on show: leaving the overlay must not replay its
+  // entrance animation (a fade and slide of all its text).
+  view.classList.add('is-handed');
   view.classList.remove('is-arriving','is-revealed');canvas.classList.remove('is-fading');canvasOn(false);
-  transition=null;layoutKey='';releaseHeight();scheduleGrid();
+  glideLand();transition=null;layoutKey='';releaseHeight();scheduleGrid();
   if(focus)view.querySelector('h2')?.focus({preventScroll:true});
  }};
  startTransition(t,tune.morphMs+FADE_MS+400);
@@ -541,12 +544,14 @@ function morphForward(name,focus){
  const old=fluid,sample=sampleText(shape,panelBudget());
  if(!sample.points.length){unstage(view);releaseHeight();return false;}
  current=name;chrome(name);window.scrollTo(0,0);
+ const fromLine=lineState(homeLine);
  home.classList.add('is-leaving');release({pointerId:pointer.id});magnetOn=false;drip=null;burstUntil=0;
  renderer.setMaterial(sample.material);
  fluid=new Fluid(sample.points,w,h,sample.spacing);
  const from=Array.from({length:old.n},(_,j)=>({x:old.x[j],y:old.y[j]})),pair=matchPoints(from,sample.points);
  for(let i=0;i<fluid.n;i++){const j=pair[i];fluid.x[i]=old.x[j];fluid.y[i]=old.y[j];fluid.vx[i]=old.vx[j]*.3;fluid.vy[i]=old.vy[j]*.3;}
  flightSizes(handOver(home,view,focus),old.spacing,sample.sizes,sample.coarse);
+ glideStart(fromLine,viewLines.get(view));
  return true;
 }
 // Section to section, including project pages: the current heading flows
@@ -560,6 +565,7 @@ function morphBetween(from,name,focus){
  if(!reachDown(Math.max(fromView.offsetHeight,view.offsetHeight))){unstage(view);canvasOn(false);releaseHeight();return false;}
  const a=sampleText(src,panelBudget()),b=sampleText(dst,panelBudget());
  if(!a.points.length||!b.points.length){unstage(view);canvasOn(false);releaseHeight();return false;}
+ const fromLine=lineState(viewLines.get(fromView));
  current=name;chrome(name);window.scrollTo(0,0);
  fromView.classList.add('is-leaving');
  renderer.setMaterial(b.material);
@@ -568,6 +574,7 @@ function morphBetween(from,name,focus){
  const pair=matchPoints(a.points,b.points);
  for(let i=0;i<fluid.n;i++){const j=pair[i],p=a.points[j];fluid.x[i]=p.x;fluid.y[i]=p.y;fromSizes[i]=a.sizes[j];}
  flightSizes(handOver(fromView,view,focus),fromSizes,b.sizes,Math.max(a.coarse,b.coarse));
+ glideStart(fromLine,viewLines.get(view));
  draw();
  return true;
 }
@@ -575,7 +582,7 @@ function morphBetween(from,name,focus){
 // text and flows to the initials. For the flight the initials are sampled
 // as finely as the text, so every drop has a target of its own and the
 // liquid stays fine all the way; the regular initials take over at rest.
-function arriveFrom({shape,height}){
+function arriveFrom({shape,height,line}){
  if(!renderer||!shape||!reachDown(height)){releaseHeight();rebuild();scatter();return;}
  const layout=glyphLayout(),ms=sampleInitials(layout);
  const sample=sampleText(shape,panelBudget());
@@ -586,8 +593,9 @@ function arriveFrom({shape,height}){
  const pair=matchPoints(targets,sample.points);
  for(let i=0;i<fluid.n;i++){const p=targets[pair[i]];fluid.tx[i]=p.x;fluid.ty[i]=p.y;}
  renderer.setMaterial(ms.material);layoutKey='';
- const t={finish(){for(const id of t.timers)clearTimeout(id);transition=null;releaseHeight();rebuild(true);}};
+ const t={finish(){for(const id of t.timers)clearTimeout(id);glideLand();transition=null;releaseHeight();rebuild(true);}};
  startTransition(t,tune.morphMs);
+ glideStart(line,homeLine);
  flightSizes(t,sample.sizes,size*tune.dropScale,sample.coarse);
  t.way=Float32Array.from({length:fluid.n},(_,i)=>Math.max(1,Math.hypot(fluid.x[i]-fluid.tx[i],fluid.y[i]-fluid.ty[i])));
  idleSince=performance.now();
@@ -599,12 +607,12 @@ function show(name,focus=true){
  const from=current;
  if(canMorph()&&from&&from!=='home'&&name!=='home'&&morphBetween(from,name,focus))return;
  if(canMorph()&&from==='home'&&name!=='home'&&morphForward(name,focus))return;
- homeEntry=canMorph()&&name==='home'&&from&&from!=='home'?{shape:headingShape(views.get(from)),height:views.get(from).offsetHeight}:null;
+ homeEntry=canMorph()&&name==='home'&&from&&from!=='home'?{shape:headingShape(views.get(from)),height:views.get(from).offsetHeight,line:lineState(viewLines.get(views.get(from)))}:null;
  plainShow(name,focus);
 }
 function plainShow(name,focus){
  current=name;
- for(const [key,view] of views){const on=key===name;view.hidden=!on;view.classList.toggle('is-active',on);}
+ for(const [key,view] of views){const on=key===name;view.hidden=!on;view.classList.toggle('is-active',on);view.classList.remove('is-handed');}
  chrome(name);window.scrollTo(0,0);canvasOn(name==='home');
  if(name==='home'){
   release({pointerId:pointer.id});last=0;idleSince=performance.now();resetMotion();
@@ -852,6 +860,12 @@ function pluckable(host,driven=false){
   if(step(dt))raf=requestAnimationFrame(swing);else{raf=0;then=0;}
  }
  function grab(){grabbed=true;cancelAnimationFrame(raf);raf=0;then=0;velocity=0;}
+ // A gliding line arrived here: this line carries on with its swing.
+ function take(o,v){
+  grabbed=false;anchor=.5;offset=o;velocity=v;
+  if(reducedMotion.matches)offset=velocity=0;else if(!driven&&!raf&&(offset||velocity))raf=requestAnimationFrame(swing);
+  render();
+ }
  function letGo(){
   if(!grabbed)return;grabbed=false;
   offset=clamped();
@@ -874,10 +888,55 @@ function pluckable(host,driven=false){
  new ResizeObserver(fit).observe(host);
  window.addEventListener('resize',fit,{passive:true});
  fit();
- return {step,shape(){return {top:host.getBoundingClientRect().top,width,anchor,offset:clamped(),rate};}};
+ return {step,host,take,hide(on){host.classList.toggle('is-gliding',on);},shape(){return {top:host.getBoundingClientRect().top,width,anchor,offset:clamped(),rate};}};
 }
-document.querySelectorAll('.panel h2').forEach(h2=>{const line=document.createElement('div');h2.after(line);pluckable(line);});
-homeLine=pluckable(document.querySelector('[data-line]'),true);
+// Every page's line, by its view.
+const viewLines=new Map();
+document.querySelectorAll('.panel h2').forEach(h2=>{const line=document.createElement('div');h2.after(line);viewLines.set(h2.closest('.view'),pluckable(line));});
+homeLine=pluckable(document.querySelector('[data-line]'),true);viewLines.set(home,homeLine);
+
+// While the page changes, one line glides from the line of the page on show
+// to the line of the next one: eased in and out over most of the flight, and
+// bending a little as if drawn through the liquid. Both real lines hide
+// meanwhile; on arrival the new one takes over the glide's swing, so the
+// hand-over cannot be seen.
+const GLIDE_SHARE=.85,GLIDE_SPRING=420,GLIDE_DAMP=4.2,GLIDE_LAG=1.2;
+const glide={svg:null,path:null,run:null};
+// Page position of a line as laid out, without a view's entrance animation.
+function lineTop(line){
+ const view=line.host.closest('.view'),tf=view?getComputedStyle(view).transform:'none';
+ return line.host.getBoundingClientRect().top+scrollY-(tf&&tf!=='none'?new DOMMatrixReadOnly(tf).m42:0);
+}
+const lineState=line=>line&&line.host.offsetParent?{line,y:lineTop(line),offset:line.shape().offset}:null;
+function glideStart(from,to){
+ glideLand();
+ if(!from||!to||!to.host.offsetParent||reducedMotion.matches)return;
+ if(!glide.svg){
+  glide.svg=document.createElementNS(SVG,'svg');glide.path=document.createElementNS(SVG,'path');
+  glide.svg.classList.add('glide-line');glide.svg.setAttribute('aria-hidden','true');glide.svg.append(glide.path);document.body.append(glide.svg);
+ }
+ glide.run={from:from.line,to,y0:from.y,y1:lineTop(to),m:from.offset,v:0,start:performance.now(),then:0};
+ from.line.hide(true);to.hide(true);glide.svg.style.display='';
+ requestAnimationFrame(glideTick);
+}
+function glideTick(now){
+ const g=glide.run;if(!g)return;
+ const dt=g.then?Math.min(1/30,(now-g.then)/1000):1/60;g.then=now;
+ const ms=tune.morphMs*GLIDE_SHARE,k=Math.max(0,Math.min(1,(now-g.start)/ms));
+ // Smootherstep and its acceleration: the ends ease in and out, the middle
+ // lags behind them on a soft spring.
+ const ease=k*k*k*(k*(6*k-15)+10),accel=k<1?(g.y1-g.y0)*60*k*(k-1)*(2*k-1)/(ms*ms/1e6):0;
+ g.v+=(-GLIDE_SPRING*g.m-GLIDE_LAG*accel)*dt;g.v*=Math.exp(-GLIDE_DAMP*dt);g.m+=g.v*dt;
+ const y=g.y0+(g.y1-g.y0)*ease,width=document.documentElement.clientWidth;
+ glide.svg.style.width=width+'px';glide.svg.style.transform=`translateY(${(y-scrollY-200).toFixed(2)}px)`;
+ glide.path.setAttribute('d',`M0 200 Q${(width/2).toFixed(1)} ${(200+g.m*2).toFixed(1)} ${width} 200`);
+ requestAnimationFrame(glideTick);
+}
+function glideLand(){
+ const g=glide.run;if(!g)return;
+ glide.run=null;glide.svg.style.display='none';
+ g.from.hide(false);g.to.hide(false);g.to.take(g.m,g.v);
+}
 
 // ----------------------------------------------------------------- start ---
 show(viewFromHash(),false);
