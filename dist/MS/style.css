@@ -14,15 +14,6 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .link:hover{opacity:.55}
 
 /* Intro */
-.intro{border:0;padding:0;background:transparent;max-width:min(28rem,calc(100% - 2rem))}
-.intro::backdrop{background:rgba(24,26,28,.78)}
-.intro[open]{animation:enter .45s var(--ease)}
-.intro-card{background:#1e2022;color:#f3f3f0;border:1px solid rgba(255,255,255,.16);padding:1.5rem 1.6rem 1.35rem}
-.intro-kicker{margin:0 0 .6rem;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(243,243,240,.6)}
-.intro-text{margin:0 0 1.25rem;font-size:17px;line-height:1.55}
-.intro form{margin:0}
-.intro .link{font-size:15px;letter-spacing:.04em}
-.intro :focus-visible{outline-color:#f3f3f0}
 
 /* Navigation */
 .hud{position:fixed;z-index:20;top:1rem;left:1.25rem;right:1.25rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;font-size:14px;letter-spacing:.04em;pointer-events:none}
@@ -68,7 +59,8 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .and{opacity:.4}
 .home .line{margin:.6rem 0 0}
 .hint{margin:2.5rem 0 0;font-size:14px;letter-spacing:.06em;opacity:.45}
-.motion-pill{display:inline-flex;align-items:center;gap:.5rem;margin:1.75rem auto 0;padding:.6rem 1.05rem;border:1px solid color-mix(in srgb,var(--ink) 14%,transparent);border-radius:999px;font-size:13px;letter-spacing:.04em;color:color-mix(in srgb,var(--ink) 70%,transparent);transition:background .2s,color .2s}
+.hint[hidden]{display:none}
+.motion-pill{display:inline-flex;align-items:center;gap:.5rem;margin:2.5rem auto 0;padding:.6rem 1.05rem;border:1px solid color-mix(in srgb,var(--ink) 14%,transparent);border-radius:999px;font-size:13px;letter-spacing:.04em;color:color-mix(in srgb,var(--ink) 70%,transparent);transition:background .2s,color .2s}
 .motion-pill:hover,.motion-pill:active{background:color-mix(in srgb,var(--ink) 6%,transparent);color:var(--ink)}
 .motion-pill[hidden]{display:none}
 .motion-pill svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.2;stroke-linecap:round}
@@ -154,4 +146,4 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .noscript{position:fixed;left:1.25rem;right:1.25rem;bottom:3rem;text-align:center;font-size:14px}
 
 @media(max-width:640px){.initials{font-size:clamp(5.5rem,42vw,9rem)}}
-@media(prefers-reduced-motion:reduce){.view.is-active,.intro[open]{animation:none}}
+@media(prefers-reduced-motion:reduce){.view.is-active{animation:none}}

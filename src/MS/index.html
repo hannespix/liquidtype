@@ -13,14 +13,6 @@
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-<dialog class="intro" id="intro" aria-labelledby="introTitle">
- <div class="intro-card">
-  <p class="intro-kicker" id="introTitle">So geht’s</p>
-  <p class="intro-text">Die Buchstaben <strong>M</strong> und <strong>S</strong> sind flüssig: Zieh an ihnen, halte sie gedrückt oder tippe sie kurz an, um mehr zu erfahren. Die Linie darunter lässt sich zupfen und hebt die Flüssigkeit an. Die Wörter führen zu Projekten und Kontakt. Zurück geht es mit <strong>↑ hinaus</strong> oder <strong>Esc</strong>.</p>
-  <form method="dialog"><button class="link" id="introOk" type="submit">Alles klar</button></form>
- </div>
-</dialog>
-
 <header class="hud">
  <button class="link" id="back" type="button" hidden>↑ hinaus</button>
  <p class="crumb" id="crumb" aria-live="polite">Start</p>
@@ -37,7 +29,7 @@
     <p class="tagline"><button class="link" type="button" data-go="projects">Innenarchitektur</button><span class="and">und</span><button class="link" type="button" data-go="contact">Raumdesign</button></p>
     <div data-line></div>
    </div>
-   <p class="hint"><span id="hintText">Antippen öffnet. Ziehen bewegt. Halten lässt platzen.</span></p>
+   <p class="hint" id="hint" role="status" hidden><span id="hintText"></span></p>
    <button class="motion-pill" id="motionButton" type="button" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="2" width="6" height="12" rx="1.5"/><path d="M2.5 5.5c-.8 1.5-.8 3.5 0 5M13.5 5.5c.8 1.5.8 3.5 0 5"/></svg><span>Bewegung einschalten</span></button>
   </div>
  </section>
