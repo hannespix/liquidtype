@@ -1,11 +1,11 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=174b84c3';
-import {FluidRenderer} from '../render.mjs?v=174b84c3';
-import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=174b84c3';
-import {matchPoints} from './match.mjs?v=174b84c3';
-import {restrain,sagWeight} from './coupling.mjs?v=174b84c3';
-import {createQuality} from '../quality.mjs?v=174b84c3';
-import {Upright} from './sensors.mjs?v=174b84c3';
+import {Fluid} from '../physics.mjs?v=f489bc93';
+import {FluidRenderer} from '../render.mjs?v=f489bc93';
+import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=f489bc93';
+import {matchPoints} from './match.mjs?v=f489bc93';
+import {restrain,sagWeight} from './coupling.mjs?v=f489bc93';
+import {createQuality} from '../quality.mjs?v=f489bc93';
+import {Upright} from './sensors.mjs?v=f489bc93';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -75,7 +75,7 @@ const tune={...defaults};
 const CALM_SPEED=25,LINE_LOAD_MAX=600,LINE_KICK_MAX=400;
 let renderer=null,fluid=null,w=0,h=0,last=0,accumulator=0,layoutKey='',rebuildTimer=0;
 let idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null,homeLine=null,lineLoad=0,lineKick=0;
-let holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+tune.dripMin,gap=null,magnetOn=false,letterSize=200;
+let holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+tune.dripMin,liquidArea=null,magnetOn=false,letterSize=200;
 // A settling phase blends extra parameters in for a moment and fades them
 // out toward the end, e.g. thin flow while the letters assemble or a
 // stronger pull home after a burst, without a jolt when it ends.
@@ -158,7 +158,11 @@ function rebuild(force=false){
  const size=layout[0]?.size||200;
  centre={x:(left+right)/2,y:layout[0]?layout[0].y+layout[0].height/2:h/2,rx:(right-left)*.42,ry:size*.3};
  pointer.radius=Math.max(50,Math.min(110,size*.32));
- gap=layout.length>1?{left:layout[0].x+layout[0].width-size*.2,right:layout[1].x+size*.2,top:layout[0].y,bottom:layout[0].y+layout[0].height}:null;
+ // The magnet works wherever the mouse is over the liquid letters: the area
+ // of their ink, widened by half the magnet's reach.
+ const reach=size*tune.magnetRadius*.5;let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+ for(const p of points){if(p.x<x0)x0=p.x;if(p.x>x1)x1=p.x;if(p.y<y0)y0=p.y;if(p.y>y1)y1=p.y;}
+ liquidArea=points.length?{left:x0-reach,right:x1+reach,top:y0-reach,bottom:y1+reach}:null;
  letterSize=size;
  ghost=null;draw();
 }
@@ -248,7 +252,7 @@ window.addEventListener('pointermove',e=>{
   else if(e.pointerType==='mouse'&&Math.hypot(dx,dy)<100)disturb(p.x,p.y,dx*2.5*parameters.strength,dy*2.5*parameters.strength,pointer.radius*.65);
  }
  if(pointer.down&&!pointer.dragged&&Math.hypot(e.clientX-pointer.startX,e.clientY-pointer.startY)>8){pointer.dragged=true;clearTimeout(holdTimer);}
- magnetOn=!pointer.down&&e.pointerType==='mouse'&&!!gap&&p.x>gap.left&&p.x<gap.right&&p.y>gap.top&&p.y<gap.bottom;
+ magnetOn=!pointer.down&&e.pointerType==='mouse'&&!!liquidArea&&p.x>liquidArea.left&&p.x<liquidArea.right&&p.y>liquidArea.top&&p.y<liquidArea.bottom;
  magnet.x=p.x;magnet.y=p.y;
  pointer.x=p.x;pointer.y=p.y;pointer.last=now;idleSince=now;
 },{passive:true});
