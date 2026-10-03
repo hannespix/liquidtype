@@ -85,7 +85,7 @@ const defaults={
 const tune={...defaults};
 const CALM_SPEED=25,LINE_LOAD_MAX=600,LINE_KICK_MAX=400;
 let renderer=null,fluid=null,w=0,h=0,last=0,accumulator=0,layoutKey='',rebuildTimer=0;
-let letterInk=[],idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null,homeLine=null,lineLoad=0,lineKick=0;
+let idleSince=performance.now(),suppressClickUntil=0,ghost=null,centre=null,homeLine=null,lineLoad=0,lineKick=0;
 let holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+tune.dripMin,liquidArea=null,magnetOn=false,letterSize=200;
 // A settling phase blends extra parameters in for a moment and fades them
 // out toward the end, e.g. thin flow while the letters assemble or a
@@ -174,8 +174,6 @@ function rebuild(force=false){
  for(const p of points){if(p.x<x0)x0=p.x;if(p.x>x1)x1=p.x;if(p.y<y0)y0=p.y;if(p.y>y1)y1=p.y;}
  liquidArea=points.length?{left:x0-reach,right:x1+reach,top:y0-reach,bottom:y1+reach}:null;
  letterSize=size;
- // Ink box of each letter (canvas px), for the pointer's drop to melt into.
- letterInk=layout.map(l=>{let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(const p of points)if(p.x>=l.x&&p.x<=l.x+l.width){x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);y0=Math.min(y0,p.y);y1=Math.max(y1,p.y);}return x1>=x0?{left:x0,right:x1,top:y0,bottom:y1}:null;}).filter(Boolean);
  ghost=null;draw();
 }
 function fitCanvas(){
@@ -308,7 +306,6 @@ function frame(t){
  // The home line runs on the same clock as the liquid, so both can push each other.
  if(isHome()){homeLine?.step(dt,Math.min(LINE_LOAD_MAX,lineLoad)*tune.lineLoadGain,lineKick);lineKick=0;}
  if(!fluid||!renderer)return;
- cursorSync(t);
  settleMotion(t);
  accumulator=Math.min(cap,accumulator+dt);
  if(transition){
@@ -333,12 +330,13 @@ function frame(t){
    accumulator-=1/120;
   }
  }
+ cursorSync(t);
  draw();
  quality?.frame(interval,performance.now()-work);
 }
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();renderer=null;fluid=null;home.classList.add('no-liquid');});
 canvas.addEventListener('webglcontextrestored',()=>{createRenderer();rebuild(true);});
-darkScheme.addEventListener('change',()=>{const c=colors();renderer?.setColors(c.paper,c.ink);cursorInk=c.ink;draw();});
+darkScheme.addEventListener('change',()=>{const c=colors();renderer?.setColors(c.paper,c.ink);cursorInk=c.ink;draw();cursorKick();});
 new ResizeObserver(scheduleRebuild).observe(document.getElementById('views'));
 new ResizeObserver(scheduleRebuild).observe(initials);
 document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;release({pointerId:pointer.id});resetMotion();quality?.reset();});
@@ -418,9 +416,12 @@ if(motionPossible){
 // The pointer's liquid drop (see cursor.mjs): an outline that follows the
 // pointer everywhere and, near the liquid letters, melts into them as solid
 // ink drawn with the liquid itself, so it truly flows together with M and S.
+// On the home page the liquid's own frame drives it, so the drop follows the
+// liquid wherever it is (dragged, burst, dripping); on the text pages it runs
+// on its own and sleeps while the pointer rests.
 const coarsePointer=matchMedia('(pointer: coarse)').matches;
 const chain=new DropChain(),cursorCanvas=document.createElement('canvas');
-let cursorOutline=null,cursorRaf=0,cursorThen=0,cursorSolid=[],cursorLetters=null,cursorInk=colors().ink;
+let cursorOutline=null,cursorRaf=0,cursorThen=0,cursorSolid=[],cursorInk=colors().ink;
 try{cursorCanvas.className='cursor-drop';cursorCanvas.setAttribute('aria-hidden','true');cursorOutline=new DropOutline(cursorCanvas);document.body.append(cursorCanvas);}catch{cursorOutline=null;}
 function cursorFit(){if(cursorOutline){const w=document.documentElement.clientWidth,h=innerHeight;cursorCanvas.style.width=w+'px';cursorCanvas.style.height=h+'px';cursorOutline.resize(w,h,Math.min(2,devicePixelRatio||1));}}
 function cursorTick(t){
@@ -429,12 +430,15 @@ function cursorTick(t){
  Object.assign(chain.o,{count:tune.cursorDrops,follow:tune.cursorFollow,wobble:tune.cursorWobble,rest:tune.cursorRest,decay:tune.cursorDecay,taper:tune.cursorTaper,reach:tune.meltReach,overlap:tune.meltOverlap,meltIn:tune.meltIn,meltOut:tune.meltOut});
  // A finger covers small drops: on touch screens they stay bigger.
  const R=Math.max(coarsePointer?34:18,letterSize*tune.cursorSize);
- // Nearest point of the liquid letters, in viewport px; only while they are on show.
- const letters=cursorLetters=cursorTarget(),box=letters?canvas.getBoundingClientRect():null;
- const near=letters?(x,y)=>{
-  const cx=x-box.left,cy=y-box.top;let best=null;
-  for(const r of letters){const nx=Math.min(r.right,Math.max(r.left,cx)),ny=Math.min(r.bottom,Math.max(r.top,cy)),d=Math.hypot(cx-nx,cy-ny);if(!best||d<best.d)best={d,x:nx+box.left,y:ny+box.top};}
-  return best;
+ // Nearest drop of the liquid as it is right now, in viewport px, and the
+ // distance to its surface (half a lattice step outside the drop's centre);
+ // only while the letters are on show. A few thousand drops are cheap to
+ // scan, and the drop then melts into the letters wherever they flow.
+ const liquid=cursorTarget(),box=liquid?canvas.getBoundingClientRect():null;
+ const near=liquid?(x,y)=>{
+  const cx=x-box.left,cy=y-box.top,{x:px,y:py,n}=liquid;let best=-1,least=Infinity;
+  for(let i=0;i<n;i++){const dx=px[i]-cx,dy=py[i]-cy,d2=dx*dx+dy*dy;if(d2<least){least=d2;best=i;}}
+  return best<0?null:{d:Math.max(0,Math.sqrt(least)-liquid.spacing*.5),x:px[best]+box.left,y:py[best]+box.top};
  }:null;
  const alive=chain.advance(dt,near,R),{outline,solid,scale}=chain.shape(R,tune.meltBridge);
  cursorOutline.draw(outline,R*scale*tune.cursorMerge,tune.cursorLine,cursorInk);
@@ -442,14 +446,15 @@ function cursorTick(t){
  if(alive)cursorRaf=requestAnimationFrame(cursorTick);
  else{cursorThen=0;if(!chain.ptr.on){cursorOutline.clear();cursorSolid=[];}}
 }
-// The letters the drop may melt into: only while they are on show.
-function cursorTarget(){return isHome()&&!transition&&fluid&&letterInk.length?letterInk:null;}
-// Called by the liquid's frame before it draws: steps the drop first, so the
-// part melting into the letters shows in the same frame as its outline, and
-// wakes a resting drop when those letters come, go or change.
+// The liquid the drop may melt into: only while the letters are on show.
+function cursorTarget(){return isHome()&&!transition&&fluid?.n?fluid:null;}
+// Called by the liquid's frame right before it draws: steps the drop in the
+// same frame, so the part melting into the letters moves with them and shows
+// together with its outline, as long as the drop is there at all.
 function cursorSync(t){
- if(!cursorRaf&&chain.ptr.on&&cursorLetters!==cursorTarget())cursorKick();
+ if(!cursorOutline||reducedMotion.matches)return;
  if(cursorRaf){cancelAnimationFrame(cursorRaf);cursorTick(t);}
+ else if(cursorTarget()&&(chain.ptr.on||chain.presence>.01))cursorTick(t);
 }
 function cursorKick(){if(cursorOutline&&!reducedMotion.matches&&!cursorRaf)cursorRaf=requestAnimationFrame(cursorTick);}
 function cursorAt(x,y){chain.point(x,y);cursorKick();}
@@ -750,7 +755,7 @@ function buildTune(){
   const out=document.createElement('output');
   const input=document.createElement('input');input.type='range';input.min=String(min);input.max=String(max);input.step=String(step);
   const show=()=>{const v=(target||tune)[key];input.value=String(v);input.style.setProperty('--fill',((v-min)/(max-min)*100).toFixed(1)+'%');out.value=step<1?v.toFixed(step<.01?3:2):String(Math.round(v));};
-  input.addEventListener('input',()=>{(target||tune)[key]=Number(input.value);show();saveTune();values.value=JSON.stringify(tuneValues());});
+  input.addEventListener('input',()=>{(target||tune)[key]=Number(input.value);show();saveTune();values.value=JSON.stringify(tuneValues());cursorKick();});
   row.append(name,out,input);body.append(row);inputs.push(show);show();
  }
  const refresh=()=>{for(const show of inputs)show();values.value=JSON.stringify(tuneValues());};

@@ -69,24 +69,33 @@ export class DropChain{
    d.melt+=(target-d.melt)*Math.min(1,target>d.melt?o.meltIn:o.meltOut);
    if(d.melt<.001)d.melt=0;
    if(Math.abs(target-d.melt)>.002)this.melting=true;
-   d.near=nb?{x:nb.x,y:nb.y}:null;
+   // The nearest point may hop from one drop of the liquid to the next, so
+   // the bridge follows it smoothly instead of jumping.
+   if(!nb)d.near=null;
+   else if(d.near&&d.melt>0){d.near.x+=(nb.x-d.near.x)*.35;d.near.y+=(nb.y-d.near.y)*.35;}
+   else d.near={x:nb.x,y:nb.y};
   });
  }
  // The outline (drops with their remaining radius) and the solid part
- // melting into the letters (each melting drop plus two bridge drops).
+ // melting into the letters: each melting drop plus a neck of overlapping
+ // drops to the nearest point of the liquid, thinning toward it. (The
+ // original fuses two bridge drops with a goo blur; without that blur the
+ // neck is drawn as a continuous chain.) The neck grows in once the drop
+ // has melted enough to reach, so no loose dots show on the way.
  shape(R,bridge=1){
   const outline=[],solid=[];
   this.drops.forEach((d,i)=>{
    const full=this.size(i,R),p=smooth(0,1,d.melt);
    const r=full*(1-p);if(r>.3)outline.push({x:d.x,y:d.y,r});
-   // Below a pixel a solid drop would only show as a speck.
-   if(full*p>1&&d.near){
-    solid.push({x:d.x,y:d.y,r:full*p});
-    // The original's goo blur swallows small bridge drops until they can
-    // join drop and letter; drawn without that blur, they only grow in
-    // once the drop has come close, so no loose dots show on the way.
-    const join=smooth(.35,.85,p);
-    for(let k=1;k<=2;k++){const t=k*.36,r=full*p*(.62-.12*k)*bridge*join;if(r>.75)solid.push({x:d.x+(d.near.x-d.x)*t,y:d.y+(d.near.y-d.y)*t,r});}
+   const rs=full*p;
+   // Below two pixels a solid drop only shows as a grey speck.
+   if(rs>2&&d.near){
+    solid.push({x:d.x,y:d.y,r:rs});
+    const join=smooth(.3,.7,p)*bridge;
+    if(join>0){
+     const dx=d.near.x-d.x,dy=d.near.y-d.y,L=Math.sqrt(dx*dx+dy*dy),step=Math.max(1,rs*.4);
+     for(let s=rs*.6,k=0;s<L&&k<12;s+=step,k++){const t=s/L,rr=rs*(.62-.2*t)*join;if(rr>2)solid.push({x:d.x+dx*t,y:d.y+dy*t,r:rr});}
+    }
    }
   });
   return {outline,solid,scale:this.presence*(this.o.rest+(1-this.o.rest)*Math.min(1,this.energy))};
