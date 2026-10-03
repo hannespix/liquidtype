@@ -33,17 +33,20 @@ test('near a letter a drop melts in, bridging to it; away it drains again',()=>{
  // A letter as a box from x 300 to 400.
  const near=(x,y)=>{const nx=Math.min(400,Math.max(300,x)),ny=Math.min(300,Math.max(100,y));return {d:Math.hypot(x-nx,y-ny),x:nx,y:ny};};
  const c=new DropChain();
- // The chain trails the pointer, so it comes to rest just outside the letter.
+ // The chain trails the pointer, so it comes to rest a little way from the letter.
  run(c,20,i=>c.point(60+i*12,200),near);
- run(c,30,()=>c.point(296,200),near);
- const inside=c.shape(R);
- assert.ok(inside.solid.length>=3,'melting drop plus two bridge drops');
- const lead=inside.solid[0],bridge=inside.solid[1];
- assert.ok(bridge.x>lead.x||bridge.x===lead.x,'the bridge reaches toward the letter');
- const outlined=inside.outline.reduce((a,d)=>a+d.r,0);
+ run(c,30,()=>c.point(282,200),near);
+ const reaching=c.shape(R),lead=reaching.solid[0];
+ assert.ok(lead&&lead.r>R*.3,'the melting drop grows solid');
+ const neck=reaching.solid.filter(d=>d.y===200&&d.x>lead.x&&d!==lead);
+ assert.ok(neck.length>=3,`a neck of drops toward the letter: ${neck.length}`);
+ for(let i=1;i<neck.length;i++)assert.ok(neck[i].x>neck[i-1].x&&neck[i].r<=neck[i-1].r,'thinning toward the letter');
+ assert.ok(neck[neck.length-1].x+neck[neck.length-1].r>=300,'reaching the letter');
+ const outlined=reaching.outline.reduce((a,d)=>a+d.r,0);
  run(c,30,()=>c.point(330,200),near);
  const deeper=c.shape(R);
  assert.ok(deeper.outline.reduce((a,d)=>a+d.r,0)<outlined,'the outline draws in as it melts');
+ assert.ok(deeper.solid[0].r>lead.r,'the solid part grows');
  run(c,120,i=>c.point(60,200),near);
  const away=c.shape(R);
  assert.equal(away.solid.length,0,'away from the letters nothing stays melted');
