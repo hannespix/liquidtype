@@ -6,13 +6,13 @@
 <title>Liquid Type — Schrift in Bewegung</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23f8f8f4'/%3E%3Cpath d='M20 5C18 12 8 20 8 27a12 12 0 0024 0C32 20 22 12 20 5' fill='%23090b0a'/%3E%3C/svg%3E">
 <style>
-:root{color-scheme:light;--paper:#f8f8f4;--ink:#111411;--muted:#757770;--line:#ddded5;--accent:#c3d63c;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:var(--paper);font-synthesis:none}*{box-sizing:border-box}body{margin:0}button,input{font:inherit}button,a,input{-webkit-tap-highlight-color:transparent}button{cursor:pointer}button:focus-visible,input:focus-visible,canvas:focus-visible,a:focus-visible{outline:2px solid #738122;outline-offset:5px}a{color:inherit;text-decoration:none}.topbar{height:100px;margin:0 4.5%;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);gap:24px}.brand{display:flex;gap:12px;align-items:center;font-size:20px;letter-spacing:-1px;font-weight:750}.brand svg{width:20px;height:26px}.brand-light{font-weight:400;margin-left:5px}.edition,.live,.stage-caption,.stage-footer,.section-label,.text-control label,.bottom>span:first-child{font-family:'Courier New',monospace;font-size:10px;letter-spacing:1.3px;line-height:1.5}.edition{color:var(--muted)}.live{display:flex;align-items:center;gap:9px;white-space:nowrap}.live i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#879b25;box-shadow:0 0 0 4px #879b2512}.live i.paused{background:#999;box-shadow:none}.experience{height:calc(100svh - 10px);min-height:620px}.sticky-stage{position:sticky;top:0;height:calc(100svh - 250px);min-height:430px;display:flex;flex-direction:column;padding:28px 4.5% 22px}.stage-caption,.stage-footer{display:flex;justify-content:space-between;align-items:center;color:var(--muted);gap:20px}.stage-caption{font-size:9px;letter-spacing:1.6px}.canvas-wrap{flex:1;position:relative;min-height:280px;margin:0 -2%;isolation:isolate}canvas{width:100%;height:100%;display:block;position:absolute;inset:0;touch-action:none;cursor:grab}canvas:active{cursor:grabbing}.axis{position:absolute;top:50%;font-family:monospace;color:#9c9f91;font-size:16px;pointer-events:none}.axis-left{left:0}.axis-right{right:0}.stage-footer{font-size:9px;letter-spacing:1px;color:#66695e}.tiny-arrow{font-size:18px;margin-right:10px}.scroll-cue{display:flex;align-items:center;gap:14px}.scroll-cue>span{font-size:21px}.cursor{position:absolute;left:0;top:0;width:88px;height:88px;border:1px solid #92978260;border-radius:50%;display:none;place-items:center;pointer-events:none;transform:translate(-50%,-50%);z-index:2;mix-blend-mode:multiply}.cursor span{font-family:monospace;letter-spacing:2px;font-size:9px;color:#6c725e}.cursor.dragging{background:#c3d63c19;border-color:#a9bc31}.cursor.dragging span{opacity:0}.controls{margin:-180px 4.5% 0;position:relative;z-index:3;display:grid;grid-template-columns:minmax(210px,.8fr) minmax(450px,2fr) 142px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--paper);padding:28px 0;gap:30px}.text-control{border-right:1px solid var(--line);padding-right:30px}.text-control label{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);letter-spacing:1px}.input-row{display:flex;align-items:center;border-bottom:1px solid #999e8b;margin-top:10px}.input-row input{font-family:Georgia,'Times New Roman',serif;font-size:29px;letter-spacing:-1px;background:none;border:0;outline:none;width:100%;padding:3px 0 9px;color:var(--ink);min-width:0}.input-row>span{font-size:22px;color:#868c79}.text-control p{font-size:11px;line-height:1.5;color:var(--muted);margin:11px 0 0}.section-label{display:flex;justify-content:space-between;font-size:9px;letter-spacing:1px;color:var(--muted);margin-bottom:23px;gap:16px}.section-label>span:last-child{font-size:8px;opacity:.75}.sliders{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:23px}.slider-label>span{font-size:11px;white-space:nowrap;display:flex;flex-wrap:wrap;gap:5px;justify-content:space-between}.slider-label output{font:10px 'Courier New',monospace;color:#6d7558}.slider-label small{display:flex;justify-content:space-between;font-size:9px;color:#8a8f7f}.slider-label input{display:block;width:100%;height:22px;margin:10px 0 5px;accent-color:#171b13;appearance:none;background:transparent;cursor:pointer}.slider-label input::-webkit-slider-runnable-track{height:2px;background:linear-gradient(to right,#444b32 var(--fill,50%),#d8dccd var(--fill,50%))}.slider-label input::-webkit-slider-thumb{appearance:none;width:10px;height:10px;margin-top:-4px;border-radius:50%;background:#20251a;box-shadow:0 0 0 4px var(--paper)}.slider-label input::-moz-range-track{height:2px;background:#d8dccd}.slider-label input::-moz-range-thumb{width:10px;height:10px;border:0;border-radius:50%;background:#20251a}.actions{border-left:1px solid var(--line);padding-left:24px;display:flex;flex-direction:column;justify-content:center;gap:8px}.actions button{border:1px solid var(--line);border-radius:4px;background:transparent;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 8px;font-size:11px;white-space:nowrap;color:var(--ink)}.actions button:first-child{background:var(--ink);border-color:var(--ink);color:var(--paper)}.actions button:hover{background:#e7e9df}.actions button:first-child:hover{background:#363b2e}.actions button>span:first-child{font-size:15px}.bottom{margin:0 4.5%;padding:27px 0 36px;display:flex;align-items:center;justify-content:space-between;gap:30px}.bottom>span:first-child{font-size:9px;color:var(--muted)}.bottom p{font-size:10px;color:#868b7c;line-height:1.7;text-align:center;margin:0}.footer-mark{font:italic 38px Georgia,serif;letter-spacing:-5px}.fallback{position:absolute;inset:0;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:20px}.fallback[hidden],.empty-note[hidden]{display:none}.fallback strong{font:clamp(35px,15vw,180px) Georgia,serif;max-width:100%;overflow-wrap:anywhere}.fallback p{font-size:13px;max-width:430px;line-height:1.6}.fallback button{border:1px solid var(--line);background:transparent;border-radius:3px;padding:10px 18px}.empty-note{position:absolute;inset:45% 20px auto;text-align:center;font:italic 24px Georgia,serif;color:#878d7b;pointer-events:none}
+:root{color-scheme:light;--paper:#f8f8f4;--ink:#111411;--muted:#757770;--line:#ddded5;--accent:#c3d63c;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:var(--paper);font-synthesis:none}*{box-sizing:border-box}body{margin:0}button,input{font:inherit}button,a,input{-webkit-tap-highlight-color:transparent}button{cursor:pointer}button:focus-visible,input:focus-visible,canvas:focus-visible,a:focus-visible{outline:2px solid #738122;outline-offset:5px}a{color:inherit;text-decoration:none}.topbar{height:100px;margin:0 4.5%;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);gap:24px}.brand{display:flex;gap:12px;align-items:center;font-size:20px;letter-spacing:-1px;font-weight:750}.brand svg{width:20px;height:26px}.brand-light{font-weight:400;margin-left:5px}.edition,.live,.stage-caption,.stage-footer,.section-label,.text-control label,.bottom>span:first-child{font-family:'Courier New',monospace;font-size:10px;letter-spacing:1.3px;line-height:1.5}.edition{color:var(--muted)}.live{display:flex;align-items:center;gap:9px;white-space:nowrap}.live i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#879b25;box-shadow:0 0 0 4px #879b2512}.live i.paused{background:#999;box-shadow:none}.experience{height:calc(100svh - 10px);min-height:620px}.sticky-stage{position:sticky;top:0;height:calc(100svh - 250px);min-height:430px;display:flex;flex-direction:column;padding:28px 4.5% 22px}.stage-caption,.stage-footer{display:flex;justify-content:space-between;align-items:center;color:var(--muted);gap:20px}.stage-caption{font-size:9px;letter-spacing:1.6px}.canvas-wrap{flex:1;position:relative;min-height:280px;margin:0 -2%;isolation:isolate}canvas{width:100%;height:100%;display:block;position:absolute;inset:0;touch-action:none;cursor:grab}canvas:active{cursor:grabbing}.axis{position:absolute;top:50%;font-family:monospace;color:#9c9f91;font-size:16px;pointer-events:none}.axis-left{left:0}.axis-right{right:0}.stage-footer{font-size:9px;letter-spacing:1px;color:#66695e}.tiny-arrow{font-size:18px;margin-right:10px}.scroll-cue{display:flex;align-items:center;gap:14px}.scroll-cue>span{font-size:21px}.cursor{position:absolute;left:0;top:0;width:88px;height:88px;border:1px solid #92978260;border-radius:50%;display:none;place-items:center;pointer-events:none;transform:translate(-50%,-50%);z-index:2;mix-blend-mode:multiply}.cursor span{font-family:monospace;letter-spacing:2px;font-size:9px;color:#6c725e}.cursor.dragging{background:#c3d63c19;border-color:#a9bc31}.cursor.dragging span{opacity:0}.controls{margin:-180px 4.5% 0;position:relative;z-index:3;display:grid;grid-template-columns:minmax(210px,.8fr) minmax(450px,2fr) 142px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--paper);padding:28px 0;gap:30px}.text-control{border-right:1px solid var(--line);padding-right:30px}.text-control label{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);letter-spacing:1px}.input-row{display:flex;align-items:center;border-bottom:1px solid #999e8b;margin-top:10px}.input-row input{font-family:Georgia,'Times New Roman',serif;font-size:29px;letter-spacing:-1px;background:none;border:0;outline:none;width:100%;padding:3px 0 9px;color:var(--ink);min-width:0}.input-row>span{font-size:22px;color:#868c79}.text-control p{font-size:11px;line-height:1.5;color:var(--muted);margin:11px 0 0}.section-label{display:flex;justify-content:space-between;font-size:9px;letter-spacing:1px;color:var(--muted);margin-bottom:23px;gap:16px}.section-label>span:last-child{font-size:8px;opacity:.75}.sliders{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:23px}.slider-label>span{font-size:11px;white-space:nowrap;display:flex;flex-wrap:wrap;gap:5px;justify-content:space-between}.slider-label output{font:10px 'Courier New',monospace;color:#6d7558}.slider-label small{display:flex;justify-content:space-between;font-size:9px;color:#8a8f7f}.slider-label input{display:block;width:100%;height:22px;margin:10px 0 5px;accent-color:#171b13;appearance:none;background:transparent;cursor:pointer}.slider-label input::-webkit-slider-runnable-track{height:2px;background:linear-gradient(to right,#444b32 var(--fill,50%),#d8dccd var(--fill,50%))}.slider-label input::-webkit-slider-thumb{appearance:none;width:10px;height:10px;margin-top:-4px;border-radius:50%;background:#20251a;box-shadow:0 0 0 4px var(--paper)}.slider-label input::-moz-range-track{height:2px;background:#d8dccd}.slider-label input::-moz-range-thumb{width:10px;height:10px;border:0;border-radius:50%;background:#20251a}.actions{border-left:1px solid var(--line);padding-left:24px;display:flex;flex-direction:column;justify-content:center;gap:8px}.actions button{border:1px solid var(--line);border-radius:4px;background:transparent;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 8px;font-size:11px;white-space:nowrap;color:var(--ink)}.actions button:first-child{background:var(--ink);border-color:var(--ink);color:var(--paper)}.actions button:hover{background:#e7e9df}.actions button:first-child:hover{background:#363b2e}.actions button>span:first-child{font-size:15px}.effects{grid-column:1/-1;border-top:1px solid var(--line);padding-top:24px}.effects .section-label{margin-bottom:16px}.effect-list{display:flex;flex-wrap:wrap;gap:8px}.effect{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:4px;background:transparent;padding:9px 13px;font-size:11px;color:var(--muted);white-space:nowrap;transition:color .2s,border-color .2s,background .2s}.effect i{width:7px;height:7px;border-radius:50%;background:#cfd1c6;flex:none;transition:background .2s,box-shadow .2s}.effect[aria-pressed="true"]{color:var(--ink);border-color:#c9ccbd}.effect[aria-pressed="true"] i{background:#879b25;box-shadow:0 0 0 4px #879b2512}.effect:hover{background:#e7e9df}.effect[hidden],.effect-note[hidden]{display:none}.effect-note{font-size:10px;line-height:1.5;color:var(--muted);margin:12px 0 0}.bottom{margin:0 4.5%;padding:27px 0 36px;display:flex;align-items:center;justify-content:space-between;gap:30px}.bottom>span:first-child{font-size:9px;color:var(--muted)}.bottom p{font-size:10px;color:#868b7c;line-height:1.7;text-align:center;margin:0}.footer-mark{font:italic 38px Georgia,serif;letter-spacing:-5px}.fallback{position:absolute;inset:0;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:20px}.fallback[hidden],.empty-note[hidden]{display:none}.fallback strong{font:clamp(35px,15vw,180px) Georgia,serif;max-width:100%;overflow-wrap:anywhere}.fallback p{font-size:13px;max-width:430px;line-height:1.6}.fallback button{border:1px solid var(--line);background:transparent;border-radius:3px;padding:10px 18px}.empty-note{position:absolute;inset:45% 20px auto;text-align:center;font:italic 24px Georgia,serif;color:#878d7b;pointer-events:none}
 @media(min-width:1600px){.topbar,.controls,.bottom{margin-left:7%;margin-right:7%}.sticky-stage{padding-left:7%;padding-right:7%}}
 @media(max-width:1100px){.controls{grid-template-columns:220px 1fr;gap:24px}.actions{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);padding:16px 0 0;flex-direction:row}.actions button{min-width:145px}.sliders{gap:18px}.section-label>span:last-child{display:none}.sticky-stage{height:calc(100svh - 280px)}.controls{margin-top:-180px}}
 @media(max-width:700px){.topbar{height:76px;margin:0 6%;gap:12px}.brand{font-size:18px}.brand svg{width:17px}.edition{display:none}.live{font-size:8px;letter-spacing:.8px}.experience{height:calc(72svh + 140px);min-height:550px}.sticky-stage{height:59svh;min-height:350px;padding:24px 6% 22px}.canvas-wrap{min-height:230px;margin:0 -2%}.stage-caption{font-size:7px;letter-spacing:1px}.stage-footer{font-size:7px;letter-spacing:.2px;gap:10px}.tiny-arrow{margin-right:3px;font-size:15px}.scroll-cue{gap:5px}.scroll-cue>span{font-size:17px}.controls{margin:-130px 6% 0;padding-top:22px;grid-template-columns:1fr;gap:23px}.text-control{border-right:0;padding:0}.input-row input{font-size:32px}.text-control p{font-size:10px}.section-label{margin-bottom:20px}.section-label>span:last-child{display:block;font-size:7px}.sliders{grid-template-columns:1fr 1fr;gap:25px 30px}.slider-label>span{font-size:11px}.slider-label input{height:26px;margin-top:9px}.actions{padding-top:20px}.actions button{flex:1}.bottom{margin:0 6%;align-items:flex-start;gap:18px;flex-wrap:wrap}.bottom>span:first-child{font-size:8px}.bottom p{order:3;width:100%;text-align:left;font-size:10px}.footer-mark{font-size:30px;line-height:20px}.cursor{display:none!important}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 @media(min-width:701px) and (max-width:1100px){.sliders{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 24px}}
-@media(max-width:700px){.actions button{min-width:0}}
+@media(max-width:700px){.actions button{min-width:0}.effects{padding-top:20px}.effect{padding:9px 11px}}
 
 </style>
 </head>
@@ -52,6 +52,19 @@
    </div>
   </div>
   <div class="actions"><button id="pause" type="button" aria-pressed="false"><span id="pauseIcon" aria-hidden="true">Ⅱ</span><span id="pauseLabel">Pause</span></button><button id="reset" type="button"><span aria-hidden="true">↺</span> Zurücksetzen</button></div>
+  <div class="effects" role="group" aria-labelledby="effectsLabel">
+   <div class="section-label"><span id="effectsLabel">03 / DIE EFFEKTE</span><span>EINZELN AN- UND AUSSCHALTEN</span></div>
+   <div class="effect-list">
+    <button class="effect" type="button" data-effect="cursor" aria-pressed="true"><i aria-hidden="true"></i>Tropfen am Zeiger</button>
+    <button class="effect" type="button" data-effect="magnet" aria-pressed="true"><i aria-hidden="true"></i>Magnet</button>
+    <button class="effect" type="button" data-effect="burst" aria-pressed="true"><i aria-hidden="true"></i>Halten lässt platzen</button>
+    <button class="effect" type="button" data-effect="drips" aria-pressed="true"><i aria-hidden="true"></i>Tropfen fallen</button>
+    <button class="effect" type="button" data-effect="idle" aria-pressed="true"><i aria-hidden="true"></i>Unsichtbare Hand</button>
+    <button class="effect" type="button" data-effect="assemble" aria-pressed="true"><i aria-hidden="true"></i>Zusammensetzen</button>
+    <button class="effect" type="button" data-effect="motion" aria-pressed="false" hidden><i aria-hidden="true"></i>Bewegungssensor</button>
+   </div>
+   <p class="effect-note" id="effectNote" role="status" hidden></p>
+  </div>
  </section>
  <footer class="bottom"><span>TYPE IS NO LONGER STILL.</span><p>Eine spielerische 2D-Flüssigkeitssimulation.<br>Mit Kohäsion, Trägheit und einem Gedächtnis für Buchstaben.</p><span class="footer-mark" aria-hidden="true">lt.</span></footer>
 </main>
@@ -156,7 +169,7 @@ class Fluid {
 }
 
 
-const vertex=`#version 300 es
+const pointVertex=`#version 300 es
 precision highp float;
 in vec2 position;
 in vec2 home;
@@ -185,7 +198,7 @@ void main(){
  dropRadius=size*2.1*grow;amplitude=mix(1.,fineAmp,f*moving);
  gl_Position=vec4(position/resolution*vec2(2.,-2.)+vec2(-1.,1.),0.,1.);gl_PointSize=min(maxPoint,size*pointScale*grow);
 }`;
-const drop=`#version 300 es
+const dropFragment=`#version 300 es
 precision highp float;
 uniform sampler2D glyphMaterial;
 uniform vec2 resolution;
@@ -211,11 +224,11 @@ void main(){
  color=vec4(kernel*mix(ink,1.,shape),kernel,kernel*shape,0.);
 
 }`;
-const screen=`#version 300 es
+const screenVertex=`#version 300 es
 precision highp float;
 out vec2 uv;
 void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));uv=p;gl_Position=vec4(p*2.-1.,0.,1.);}`;
-const surface=`#version 300 es
+const surfaceFragment=`#version 300 es
 precision highp float;
 in vec2 uv;
 uniform sampler2D density;
@@ -251,7 +264,7 @@ class FluidRenderer {
   const gl=canvas.getContext('webgl2',{alpha:false,antialias:false,powerPreference:'high-performance',depth:false,stencil:false});
   if(!gl)throw new Error('WebGL2 ist auf diesem Gerät nicht verfügbar.');
   this.gl=gl;this.canvas=canvas;this.floatSurface=!!gl.getExtension('EXT_color_buffer_float');
-  this.points=this.program(vertex,drop);this.surface=this.program(screen,surface);
+  this.points=this.program(pointVertex,dropFragment);this.surface=this.program(screenVertex,surfaceFragment);
   // Uniform locations are looked up once instead of on every frame.
   const where=(program,names)=>Object.fromEntries(names.map(n=>[n,gl.getUniformLocation(program,n)]));
   this.at=where(this.points,['resolution','pointScale','maxPoint','glyphMaterial','pixelScale','shrink','fine','fineAmp']);
@@ -495,6 +508,392 @@ function createQuality(gl,{floatSurface=true,onChange=()=>{},search=globalThis.l
  return q;
 }
 
+// Phone motion readings to directions on the screen. Pure functions, no DOM.
+//
+// The spec's device frame has x to the right and y to the top of the phone
+// held upright; a phone at rest reads +9.8 m/s² "up". Real devices differ:
+// iOS reports the opposite signs, and some devices and browsers turn the
+// axes by a quarter (with the screen, or because the device's natural
+// orientation is landscape). People hold a phone with the page upright,
+// though, so a steady reading of a clearly tilted phone shows where the
+// screen's bottom lies for this device. `Upright` learns that once and turns
+// every later reading by the quarter turns that point gravity down the screen.
+// `MotionReader` turns the readings into what the liquid feels.
+
+// Direction the liquid moves on the screen (x right, y down) for a device
+// reading (x, y), given the screen's rotation in degrees: opposite to the
+// device's own acceleration.
+function screenDirection(x,y,angle=0){
+ const a=angle*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+ return {x:-(x*c-y*s),y:x*s+y*c};
+}
+// Turn a screen vector by q quarter turns clockwise (x right, y down).
+function quarter(v,q){
+ switch(((q%4)+4)%4){
+  case 1:return {x:-v.y,y:v.x};
+  case 2:return {x:-v.x,y:-v.y};
+  case 3:return {x:v.y,y:-v.x};
+  default:return {x:v.x,y:v.y};
+ }
+}
+// Quarter turns that point the screen vector v (where a resting reading
+// lets the liquid fall) down the screen.
+function quarterToDown(v){
+ let best=0,most=-Infinity;
+ for(let q=0;q<4;q++){const d=quarter(v,q).y;if(d>most){most=d;best=q;}}
+ return best;
+}
+// Learns the quarter turns from resting readings: `need` steady readings in a
+// row, each tilted at least `min` m/s² out of flat (about 25°), none more than
+// `jitter` m/s² from the running mean. `turn` stays null until then.
+class Upright{
+ constructor({need=10,min=4.2,jitter=2.5}={}){this.need=need;this.min=min;this.jitter=jitter;this.forget();}
+ forget(){this.turn=null;this.count=0;this.x=0;this.y=0;}
+ add(x,y,angle=0){
+  if(this.turn!==null)return this.turn;
+  const v=screenDirection(x,y,angle),m=Math.hypot(v.x,v.y);
+  const steady=!this.count||Math.hypot(v.x-this.x/this.count,v.y-this.y/this.count)<=this.jitter;
+  if(m<this.min||!steady){this.count=0;this.x=this.y=0;if(m<this.min)return null;}
+  this.x+=v.x;this.y+=v.y;this.count++;
+  if(this.count>=this.need)this.turn=quarterToDown({x:this.x,y:this.y});
+  return this.turn;
+ }
+ // A reading as a direction on the screen, corrected once learned.
+ direction(x,y,angle=0){return quarter(screenDirection(x,y,angle),this.turn??0);}
+}
+
+// Turns device motion readings into what the liquid feels. Only changes
+// count: a shake (linear acceleration) or a quick tilt (the change of the
+// gravity direction) becomes a velocity change in px/s, and a faint lean
+// toward a new tilt relaxes within `relax` seconds, so holding the phone
+// still in any position does nothing lasting. Each push is limited to
+// `limit` px/s. Readings move nothing until the alignment is learned, or
+// the phone lay flat for `wait` ms; it is learned anew after `relearn()`.
+class MotionReader{
+ constructor({relax=2,limit=260,wait=1500}={}){this.relax=relax;this.limit=limit;this.wait=wait;this.upright=new Upright();this.since=null;this.reset();}
+ reset(){this.gravity=null;this.pose=null;this.last=0;}
+ relearn(){this.upright.forget();this.since=null;}
+ // One devicemotion event at `now` ms with the screen turned by `angle`
+ // degrees. gains: shake (px per metre), tilt (px/s per m/s² of turn), lean
+ // (px/s² per m/s²). Null for an unusable reading; otherwise the push
+ // (`nudge`, px/s), the `lean` (px/s²), whether the alignment is known, the
+ // linear acceleration and the raw reading. The first reading only sets
+ // the baseline (`first`).
+ read(e,now,angle,gains){
+  const g=e.accelerationIncludingGravity;
+  if(!g||g.x==null||g.y==null)return null;
+  const dt=this.last?Math.min(.1,(now-this.last)/1000):0;this.last=now;
+  if(this.since===null)this.since=now;
+  this.upright.add(g.x,g.y,angle);
+  const aligned=this.upright.turn!==null||now-this.since>this.wait;
+  const none={x:0,y:0};
+  if(!this.gravity){this.gravity={x:g.x,y:g.y};this.pose={x:g.x,y:g.y};return {first:true,aligned,nudge:none,lean:none,linear:none,g};}
+  const before={x:this.gravity.x,y:this.gravity.y},fast=1-Math.exp(-dt*10),slow=1-Math.exp(-dt/this.relax);
+  this.gravity.x+=(g.x-before.x)*fast;this.gravity.y+=(g.y-before.y)*fast;
+  this.pose.x+=(this.gravity.x-this.pose.x)*slow;this.pose.y+=(this.gravity.y-this.pose.y)*slow;
+  const a=e.acceleration,ax=a&&a.x!=null?a.x:g.x-this.gravity.x,ay=a&&a.y!=null?a.y:g.y-this.gravity.y;
+  const dir=(x,y)=>this.upright.direction(x,y,angle),clamp=v=>Math.max(-this.limit,Math.min(this.limit,v));
+  const shake=dir(ax,ay),turn=dir(this.gravity.x-before.x,this.gravity.y-before.y),lean=dir(this.gravity.x-this.pose.x,this.gravity.y-this.pose.y);
+  return {first:false,aligned,
+   nudge:{x:clamp(shake.x*gains.shake*dt+turn.x*gains.tilt),y:clamp(shake.y*gains.shake*dt+turn.y*gains.tilt)},
+   lean:{x:lean.x*gains.lean,y:lean.y*gains.lean},linear:{x:ax,y:ay},g};
+ }
+}
+
+// The pointer's liquid drop. A short chain of drops hangs on springs behind
+// the pointer and is drawn as one smooth outline. It swells while the
+// pointer moves and slowly shrinks when it rests. Near the liquid letters a
+// drop melts into them: its outline draws in while a solid drop of the same
+// size grows inside the liquid, with a neck of smaller drops reaching the
+// nearest point of the liquid. Moving away reverses it. Shared by the
+// Liquid Type pages.
+//
+// DropChain holds the motion (pure, testable); DropOutline draws the outline
+// with one WebGL shader on a transparent canvas; LiquidCursor puts both on a
+// page and lets the drop melt into its liquid.
+
+const smooth=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
+
+class DropChain{
+ // o: count, follow (spring per step), wobble (velocity kept per step),
+ // rest (size while still, share of full), decay (energy kept per step),
+ // taper (last drop this much smaller), reach and overlap (melting starts
+ // `reach` radii from a letter, completes `overlap` radii into it), melt
+ // speeds (share per step) in and out. reach 0 switches melting off.
+ constructor(o={}){
+  this.o={count:6,follow:.15,wobble:.4,rest:.05,decay:.995,taper:.7,reach:4,overlap:1.5,meltIn:.33,meltOut:.33,...o};
+  this.drops=[];this.energy=0;this.presence=0;this.moving=0;this.melting=false;this.ptr={x:NaN,y:NaN,on:false};this.last={x:NaN,y:NaN};this.acc=0;
+ }
+ point(x,y){this.ptr.x=x;this.ptr.y=y;this.ptr.on=true;}
+ leave(){this.ptr.on=false;}
+ // Advances dt seconds in fixed steps of 1/60 s, the same at any frame
+ // rate. Returns whether the drop still changes: with the pointer there it
+ // rests once it has stopped, shrunk to its resting size and finished
+ // melting, and wakes with the next move; without, once it has faded.
+ advance(dt,near=null,radius=0){
+  this.acc=Math.min(this.acc+dt,.1);
+  while(this.acc>=1/60){this.moving=this.step(near,radius);this.acc-=1/60;}
+  if(this.ptr.on)return this.moving>.05||this.energy>.01||this.presence<.99||this.melting;
+  return this.moving>.05||this.presence>.01;
+ }
+ step(near,radius){
+  const o=this.o,n=Math.max(1,Math.round(o.count)),p=this.ptr;
+  while(this.drops.length<n){const prev=this.drops[this.drops.length-1];this.drops.push({x:prev?prev.x:p.x,y:prev?prev.y:p.y,vx:0,vy:0,melt:0});}
+  this.drops.length=n;
+  if(p.on){
+   if(this.drops[0].x!==this.drops[0].x)for(const d of this.drops)Object.assign(d,{x:p.x,y:p.y,vx:0,vy:0});
+   const speed=this.last.x===this.last.x?Math.hypot(p.x-this.last.x,p.y-this.last.y):0;
+   this.last.x=p.x;this.last.y=p.y;
+   const target=Math.min(1,speed/22);
+   this.energy=target>this.energy?this.energy+(target-this.energy)*.3:this.energy*o.decay;
+  }else{this.last.x=this.last.y=NaN;this.energy*=o.decay;}
+  this.presence+=((p.on?1:0)-this.presence)*(p.on?.15:.06);
+  let moving=0;
+  for(let i=0;i<n;i++){
+   const d=this.drops[i],lead=i?this.drops[i-1]:null;
+   const tx=lead?lead.x:p.on?p.x:d.x,ty=lead?lead.y:p.on?p.y:d.y;
+   const k=Math.min(.9,o.follow*(i?1-.25*i/n:1.4));
+   d.vx=(d.vx+(tx-d.x)*k)*o.wobble;d.vy=(d.vy+(ty-d.y)*k)*o.wobble;
+   d.x+=d.vx;d.y+=d.vy;moving+=Math.abs(d.vx)+Math.abs(d.vy);
+  }
+  if(radius>0)this.melt(near,radius);
+  return moving;
+ }
+ // Full radius of drop i for the largest radius R.
+ size(i,R){
+  const o=this.o,n=this.drops.length,scale=this.presence*(o.rest+(1-o.rest)*Math.min(1,this.energy));
+  return R*scale*(1-o.taper*(n>1?i/(n-1):0));
+ }
+ melt(near,R){
+  const o=this.o;this.melting=false;
+  this.drops.forEach((d,i)=>{
+   const full=this.size(i,R);let target=0;
+   const nb=near&&o.reach>0&&full>.3?near(d.x,d.y):null;
+   if(nb)target=1-smooth(-full*o.overlap,full*o.reach+2,nb.d-full);
+   d.melt+=(target-d.melt)*Math.min(1,target>d.melt?o.meltIn:o.meltOut);
+   if(d.melt<.001)d.melt=0;
+   if(Math.abs(target-d.melt)>.002)this.melting=true;
+   // The nearest point may hop from one drop of the liquid to the next, so
+   // the bridge follows it smoothly instead of jumping.
+   if(!nb)d.near=null;
+   else if(d.near&&d.melt>0){d.near.x+=(nb.x-d.near.x)*.35;d.near.y+=(nb.y-d.near.y)*.35;}
+   else d.near={x:nb.x,y:nb.y};
+  });
+ }
+ // The outline (drops with their remaining radius) and the solid part
+ // melting into the letters: each melting drop plus a neck of overlapping
+ // drops to the nearest point of the liquid, thinning toward it. (The
+ // original fuses two bridge drops with a goo blur; without that blur the
+ // neck is drawn as a continuous chain.) The neck grows in once the drop
+ // has melted enough to reach, so no loose dots show on the way.
+ shape(R,bridge=1){
+  const outline=[],solid=[];
+  this.drops.forEach((d,i)=>{
+   const full=this.size(i,R),p=smooth(0,1,d.melt);
+   const r=full*(1-p);if(r>.3)outline.push({x:d.x,y:d.y,r});
+   const rs=full*p;
+   // Below two pixels a solid drop only shows as a grey speck.
+   if(rs>2&&d.near){
+    solid.push({x:d.x,y:d.y,r:rs});
+    const join=smooth(.3,.7,p)*bridge;
+    if(join>0){
+     const dx=d.near.x-d.x,dy=d.near.y-d.y,L=Math.sqrt(dx*dx+dy*dy),step=Math.max(1,rs*.4);
+     for(let s=rs*.6,k=0;s<L&&k<12;s+=step,k++){const t=s/L,rr=rs*(.62-.2*t)*join;if(rr>2)solid.push({x:d.x+dx*t,y:d.y+dy*t,r:rr});}
+    }
+   }
+  });
+  return {outline,solid,scale:this.presence*(this.o.rest+(1-this.o.rest)*Math.min(1,this.energy))};
+ }
+}
+
+const MAX=12;
+const VS='attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}';
+const FS=`precision highp float;
+uniform vec2 res;
+uniform float dpr;
+uniform vec3 drops[${MAX}];
+uniform int count;
+uniform float merge;
+uniform float width;
+uniform vec3 ink;
+// Smooth minimum: the drops' circles melt into one contour.
+float smin(float a,float b,float k){float h=max(k-abs(a-b),0.)/k;return min(a,b)-h*h*k*.25;}
+void main(){
+ vec2 p=vec2(gl_FragCoord.x,res.y-gl_FragCoord.y)/dpr;
+ float d=1e5;
+ for(int i=0;i<${MAX};i++){if(i>=count)break;d=smin(d,length(p-drops[i].xy)-drops[i].z,merge);}
+ float aa=.75/dpr,hw=width*.5;
+ float line=(1.-smoothstep(hw-aa,hw+aa,abs(d)))*clamp(width+.35,0.,1.);
+ gl_FragColor=vec4(ink*line,line);
+}`;
+
+class DropOutline{
+ constructor(canvas){
+  const gl=canvas.getContext('webgl',{premultipliedAlpha:true,antialias:false,alpha:true});
+  if(!gl)throw new Error('WebGL fehlt');
+  this.gl=gl;this.canvas=canvas;this.w=0;this.h=0;this.dpr=1;this.shown=false;
+  const make=(type,src)=>{const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s;};
+  const prog=gl.createProgram();gl.attachShader(prog,make(gl.VERTEX_SHADER,VS));gl.attachShader(prog,make(gl.FRAGMENT_SHADER,FS));gl.linkProgram(prog);gl.useProgram(prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  const a=gl.getAttribLocation(prog,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);
+  this.at=Object.fromEntries(['res','dpr','drops','count','merge','width','ink'].map(n=>[n,gl.getUniformLocation(prog,n)]));
+  this.data=new Float32Array(MAX*3);gl.clearColor(0,0,0,0);
+ }
+ resize(w,h,dpr){
+  this.w=w;this.h=h;this.dpr=dpr;
+  this.canvas.width=Math.round(w*dpr);this.canvas.height=Math.round(h*dpr);
+  this.gl.viewport(0,0,this.canvas.width,this.canvas.height);
+ }
+ clear(){const gl=this.gl;if(!this.shown)return;gl.disable(gl.SCISSOR_TEST);gl.clear(gl.COLOR_BUFFER_BIT);this.shown=false;}
+ // drops: [{x,y,r}] in CSS px of the viewport; merge: smooth-minimum radius.
+ draw(drops,merge,width,ink){
+  const gl=this.gl;this.clear();
+  const list=drops.slice(0,MAX);if(!list.length)return;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  list.forEach((d,i)=>{this.data[i*3]=d.x;this.data[i*3+1]=d.y;this.data[i*3+2]=d.r;x0=Math.min(x0,d.x-d.r);y0=Math.min(y0,d.y-d.r);x1=Math.max(x1,d.x+d.r);y1=Math.max(y1,d.y+d.r);});
+  // Only the box around the drop is drawn.
+  const m=merge*.5+width+4,s=this.dpr;
+  const sx=Math.max(0,Math.floor((x0-m)*s)),sy=Math.max(0,Math.floor((this.h-y1-m)*s));
+  const sw=Math.min(this.canvas.width,Math.ceil((x1+m)*s))-sx,sh=Math.min(this.canvas.height,Math.ceil((this.h-y0+m)*s))-sy;
+  if(sw<=0||sh<=0)return;
+  gl.enable(gl.SCISSOR_TEST);gl.scissor(sx,sy,sw,sh);
+  const at=this.at;
+  gl.uniform2f(at.res,this.canvas.width,this.canvas.height);gl.uniform1f(at.dpr,s);
+  gl.uniform3fv(at.drops,this.data);gl.uniform1i(at.count,list.length);
+  gl.uniform1f(at.merge,Math.max(.01,merge));gl.uniform1f(at.width,width);gl.uniform3fv(at.ink,ink);
+  gl.drawArrays(gl.TRIANGLES,0,3);this.shown=true;
+ }
+}
+
+// The drop on a page: its own transparent canvas over the viewport, pointer
+// and touch input, and melting into a liquid. `liquid()` returns
+// {fluid, canvas} while the drop may melt into that fluid (else null),
+// `radius()` the largest drop radius in px and `options()` the DropChain
+// dials plus merge (outline smoothness, × radius), line (px) and bridge.
+// Without `host` the drop follows the pointer over the whole page, with it
+// only over that element. A page whose liquid runs its own frame calls
+// sync() right before drawing, so the drop moves with the liquid and its
+// melting part (`solid`, canvas px, for the renderer's `extra`) shows in
+// the same frame as its outline; otherwise the drop runs on its own and
+// sleeps while the pointer rests. Under reduced motion there is no drop.
+class LiquidCursor{
+ constructor({liquid,radius,options,ink=[0,0,0],host=null,reduced=null}){
+  Object.assign(this,{liquid,radius,options,ink,reduced});
+  this.chain=new DropChain();this.solid=[];this.raf=0;this.then=0;this.on=true;this.outline=null;
+  this.canvas=document.createElement('canvas');this.canvas.setAttribute('aria-hidden','true');
+  this.canvas.style.cssText='position:fixed;z-index:5;left:0;top:0;pointer-events:none';
+  try{this.outline=new DropOutline(this.canvas);document.body.append(this.canvas);}catch{this.outline=null;return;}
+  this.tick=this.tick.bind(this);
+  // A new canvas size clears the outline, so it is drawn again.
+  this.fit();addEventListener('resize',()=>{this.fit();this.kick();},{passive:true});
+  const target=host||window,at=e=>this.at(e.clientX,e.clientY),away=()=>this.away();
+  target.addEventListener('pointermove',at,{passive:true});target.addEventListener('pointerdown',at,{passive:true});
+  (host||document.documentElement).addEventListener('pointerleave',away,{passive:true});addEventListener('blur',away,{passive:true});
+  // While the page scrolls under a finger, pointer events stop but touch events go on.
+  target.addEventListener('touchmove',e=>{const t=e.touches[0];if(t)this.at(t.clientX,t.clientY);},{passive:true});
+  const end=e=>{if(!e.touches.length)this.away();};
+  target.addEventListener('touchend',end,{passive:true});target.addEventListener('touchcancel',end,{passive:true});
+ }
+ get ready(){return !!this.outline&&this.on&&!this.reduced?.matches;}
+ fit(){if(this.outline){const w=document.documentElement.clientWidth,h=innerHeight;this.canvas.style.width=w+'px';this.canvas.style.height=h+'px';this.outline.resize(w,h,Math.min(2,devicePixelRatio||1));}}
+ at(x,y){if(this.ready){this.chain.point(x,y);this.kick();}}
+ away(){if(this.ready){this.chain.leave();this.kick();}}
+ kick(){if(this.ready&&!this.raf)this.raf=requestAnimationFrame(this.tick);}
+ // Switching the drop off removes it at once; on again, it appears with the next move.
+ set enabled(v){
+  this.on=!!v;if(this.on||!this.outline)return;
+  cancelAnimationFrame(this.raf);this.raf=0;this.then=0;this.outline.clear();this.solid=[];
+  this.chain.leave();this.chain.presence=0;this.chain.drops=[];
+ }
+ get enabled(){return this.on;}
+ tick(t){
+  this.raf=0;
+  const dt=this.then?Math.min(.1,(t-this.then)/1000):1/60;this.then=t;
+  const o=this.options(),R=this.radius();Object.assign(this.chain.o,o);
+  // Nearest drop of the liquid as it is right now, in viewport px, and the
+  // distance to its surface (half a lattice step outside the drop's centre).
+  // A few thousand drops are cheap to scan, and the drop then melts into the
+  // letters wherever they flow.
+  const target=this.liquid(),fluid=target?.fluid?.n?target.fluid:null,box=fluid?target.canvas.getBoundingClientRect():null;
+  const near=fluid?(x,y)=>{
+   const cx=x-box.left,cy=y-box.top,{x:px,y:py,n}=fluid;let best=-1,least=Infinity;
+   for(let i=0;i<n;i++){const dx=px[i]-cx,dy=py[i]-cy,d2=dx*dx+dy*dy;if(d2<least){least=d2;best=i;}}
+   return best<0?null:{d:Math.max(0,Math.sqrt(least)-fluid.spacing*.5),x:px[best]+box.left,y:py[best]+box.top};
+  }:null;
+  const alive=this.chain.advance(dt,near,R),{outline,solid,scale}=this.chain.shape(R,o.bridge);
+  this.outline.draw(outline,R*scale*o.merge,o.line,this.ink);
+  this.solid=box?solid.map(d=>({x:d.x-box.left,y:d.y-box.top,r:d.r})):[];
+  if(alive)this.raf=requestAnimationFrame(this.tick);
+  else{this.then=0;if(!this.chain.ptr.on){this.outline.clear();this.solid=[];}}
+ }
+ // Called by the liquid's frame right before it draws.
+ sync(t){
+  if(!this.ready)return;
+  if(this.raf){cancelAnimationFrame(this.raf);this.tick(t);}
+  else if(this.liquid()&&(this.chain.ptr.on||this.chain.presence>.01))this.tick(t);
+ }
+}
+
+// Effects shared by the Liquid Type pages, all acting on a Fluid (see
+// physics.mjs): letters condensing from a cloud, a burst away from a point,
+// a drop detaching from the lowest edge, calm detection, settling phases
+// and the path of an invisible idle hand. No DOM; random sources can be
+// passed in for tests.
+
+// Scatters every particle around its target, up to `spread` px away, inside
+// the fluid's bounds and at rest; the springs then condense the letters.
+function scatterAround(fluid,spread,random=Math.random){
+ const s=fluid.spacing,clampX=v=>Math.max(s,Math.min(fluid.width-s,v)),clampY=v=>Math.max(s,Math.min(fluid.height-s,v));
+ for(let i=0;i<fluid.n;i++){
+  const a=random()*Math.PI*2,d=spread*Math.sqrt(random());
+  fluid.x[i]=clampX(fluid.tx[i]+Math.cos(a)*d);fluid.y[i]=clampY(fluid.ty[i]+Math.sin(a)*d);fluid.vx[i]=fluid.vy[i]=0;
+ }
+}
+// Sends every particle away from (x, y), the faster the closer it is, out
+// to the larger side of the fluid. Releasing the springs for a moment
+// (`free`) is up to the page.
+function burstFrom(fluid,x,y,speed,random=Math.random){
+ const R=Math.max(fluid.width,fluid.height);
+ for(let i=0;i<fluid.n;i++){
+  const dx=fluid.x[i]-x,dy=fluid.y[i]-y,d=Math.hypot(dx,dy)||1,f=1-d/R;
+  if(f<=0)continue;
+  const v=speed*Math.sqrt(f)*(.8+.4*random());
+  fluid.vx[i]=Math.max(-1500,Math.min(1500,fluid.vx[i]+dx/d*v));fluid.vy[i]=Math.max(-1500,Math.min(1500,fluid.vy[i]+dy/d*v));
+ }
+}
+// Whether the liquid has come to rest: mean speed of a sample below `limit` px/s.
+function isCalm(fluid,limit=25){
+ let sum=0,count=0;for(let i=0;i<fluid.n;i+=37){sum+=Math.hypot(fluid.vx[i],fluid.vy[i]);count++;}
+ return count===0||sum/count<limit;
+}
+// The particles of one drop, `size` lattice steps across, at a random spot
+// of the letters' lowest edge (by their targets); empty for an empty fluid.
+function dripIndices(fluid,size,random=Math.random){
+ let lowest=-Infinity;for(let i=0;i<fluid.n;i++)if(fluid.ty[i]>lowest)lowest=fluid.ty[i];
+ const bottom=[];for(let i=0;i<fluid.n;i++)if(fluid.ty[i]>=lowest-fluid.spacing*2.5)bottom.push(i);
+ if(!bottom.length)return [];
+ const seed=bottom[Math.floor(random()*bottom.length)],sx=fluid.tx[seed],sy=fluid.ty[seed],r=fluid.spacing*size;
+ const indices=[];for(let i=0;i<fluid.n;i++)if(Math.hypot(fluid.tx[i]-sx,fluid.ty[i]-sy)<r)indices.push(i);
+ return indices;
+}
+// A settling phase blends extra parameters in for a moment and fades them
+// out toward the end, e.g. thin flow while letters condense or a stronger
+// pull home after a burst, without a jolt when it ends. A key the base
+// parameters lack (a factor such as homing) blends from 1.
+class Settle{
+ constructor(){this.until=0;this.duration=0;this.extra=null;}
+ start(now,ms,extra){this.until=now+ms;this.duration=ms;this.extra=extra;}
+ params(base,now){
+  if(now>=this.until)return base;
+  const k=Math.min(1,(this.until-now)/Math.max(1,this.duration)*1.6),out={...base};
+  for(const key in this.extra)out[key]=base[key]===undefined?1+(this.extra[key]-1)*k:base[key]+(this.extra[key]-base[key])*k;
+  return out;
+ }
+}
+// Where an invisible hand drifting around `centre` ({x, y, rx, ry}) is after
+// `s` seconds: a slow loop that never quite repeats.
+const idleHand=(centre,s)=>({x:centre.x+Math.cos(s*.45)*centre.rx,y:centre.y+Math.sin(s*.7)*centre.ry});
+
 const $=id=>document.getElementById(id);
 const canvas=$('fluid'),wrap=$('canvasWrap'),input=$('textInput'),cursor=$('cursor');
 // No alternate text layer: the only visible typography is the particle surface.
@@ -504,9 +903,18 @@ function disturb(x,y,dx,dy,radius){
 }
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 const controls=['viscosity','tension','attraction','strength'];
-const parameters={viscosity:.35,tension:.65,attraction:.5,strength:1.3};
+const parameters={viscosity:.35,tension:.65,attraction:.5,strength:1.3,gravityX:0,gravityY:0,dripGravity:1400};
 let renderer=null,fluid=null,paused=reduced.matches,failed=false,w=0,h=0,last=0,accumulator=0,textTimer,resizeTimer,quality=null;
-const pointer={x:-1000,y:-1000,down:false,radius:95,id:null,last:0};
+const pointer={x:-1000,y:-1000,down:false,radius:95,id:null,last:0,startX:0,startY:0,dragged:false};
+// The effects of the MS page, each switchable in the controls. Their dials
+// are the MS page's tuned values (see `defaults` in src/MS/ms.mjs): idle hand,
+// letters condensing from a cloud, hold to burst, drips from the lowest
+// edge, the magnet, phone motion and the pointer's liquid drop.
+const FX={idleDelay:4000,idleForce:1.4,assembleSpread:.22,assembleMs:2200,holdMs:450,burstSpeed:1200,burstFreeMs:300,
+ dripMin:6000,dripMax:11000,dripFallMs:1300,dripSize:2.3,magnetStrength:2.2,magnetRadius:.26,shakeGain:650,tiltGain:90,leanGain:120,cursorSize:.08};
+const effects={cursor:true,magnet:true,burst:true,drips:true,idle:true,assemble:true,motion:false},EFFECTS=Object.keys(effects);
+const settle=new Settle(),magnet={x:0,y:0,down:true,radius:0};
+let letterSize=200,centre=null,liquidArea=null,magnetOn=false,idleSince=performance.now(),ghost=null,holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+FX.dripMin,assembled=false;
 function updateStatus(){
  $('pause').setAttribute('aria-pressed',String(paused));$('pauseLabel').textContent=paused?'Fortsetzen':'Pause';$('pauseIcon').textContent=paused?'▶':'Ⅱ';
  $('status').textContent=failed?'GRAFIK PAUSIERT':paused?'PHYSICS PAUSED':'LIVE PHYSICS';$('statusDot').classList.toggle('paused',paused||failed);
@@ -517,21 +925,22 @@ function setParameter(name,value){
 }
 controls.forEach(name=>{$(name).addEventListener('input',e=>setParameter(name,e.target.value));setParameter(name,$(name).value);});
 function maskPoints(text,width,height){
- if(!text.trim()){const blank=document.createElement('canvas');blank.width=blank.height=1;renderer?.setMaterial(blank);return{points:[],spacing:5};}
+ if(!text.trim()){const blank=document.createElement('canvas');blank.width=blank.height=1;renderer?.setMaterial(blank);return{points:[],spacing:5,size:letterSize};}
  const ctx=document.createElement('canvas').getContext('2d');
  let size=Math.min(height*.63,width*.7,330);ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
  const measured=ctx.measureText(text).width;size*=Math.min(1,width*.86/Math.max(1,measured));ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
  const m=ctx.measureText(text),font=ctx.font,baseline=height/2+(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2;
  const {points,spacing,material}=sampleGlyphs(width,height,g=>{g.font=font;g.textAlign='center';g.fillStyle='black';g.fillText(text,width/2,baseline);},Math.round((width<700?2200:4200)*(quality?.particles??1)));
  renderer?.setMaterial(material);
- return {points,spacing};
+ return {points,spacing,size};
 }
 function setText(value,animate=true){
  input.value=Array.from(value).slice(0,32).join('');const text=input.value;
  $('charCount').textContent=Array.from(text).length+' / 32';$('fallbackText').textContent=text;
  $('emptyNote').hidden=!!text.trim();canvas.setAttribute('aria-label',`Flüssige Schrift ${text||'– leer'}. Mit Maus oder Finger ziehen. Mit Pfeiltasten Wellen erzeugen.`);
  if(!w||!h)return;
- const old=fluid;const {points,spacing}=maskPoints(text,w,h);fluid=new Fluid(points,w,h,spacing);
+ const old=fluid;const {points,spacing,size}=maskPoints(text,w,h);fluid=new Fluid(points,w,h,spacing);
+ measureText(points,size);drip=null;burstUntil=0;idleSince=performance.now();
  // Keep a short, bounded morph when typing. Particle count may change independently.
  if(animate&&old?.n&&!paused){
   for(let i=0;i<fluid.n;i++){
@@ -544,13 +953,30 @@ function setText(value,animate=true){
  $('particleCount').textContent=fluid.n.toLocaleString('de-DE')+' PARTICLES';
  draw();
 }
-function draw(){if(renderer&&fluid&&!failed)renderer.draw(fluid);}
+// Where the text is: its size for the drop and the magnet, its centre for
+// the idle hand, and the area over which the magnet works (the ink, widened
+// by half the magnet's reach).
+function measureText(points,size){
+ letterSize=size;
+ if(!points.length){centre=liquidArea=null;return;}
+ let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+ for(const p of points){if(p.x<x0)x0=p.x;if(p.x>x1)x1=p.x;if(p.y<y0)y0=p.y;if(p.y>y1)y1=p.y;}
+ centre={x:(x0+x1)/2,y:(y0+y1)/2,rx:(x1-x0)*.42,ry:size*.3};
+ const reach=size*FX.magnetRadius*.5;liquidArea={left:x0-reach,right:x1+reach,top:y0-reach,bottom:y1+reach};
+}
+function draw(){
+ if(!renderer||!fluid||failed)return;
+ // The pointer's drop melting into the letters is drawn with the liquid.
+ renderer.extra=effects.cursor?liquidCursor.solid:null;
+ renderer.draw(fluid);
+}
 function showFailure(message){failed=true;canvas.style.visibility='hidden';$('fallback').hidden=false;$('fallbackMessage').textContent=message;cursor.style.display='none';updateStatus();}
 function setup(){
  try{
   renderer=new FluidRenderer(canvas);failed=false;canvas.style.visibility='visible';$('fallback').hidden=true;
   quality??=createQuality(renderer.gl,{floatSurface:renderer.floatSurface,onChange:applyQuality});renderer.maxScale=quality.resolution;
   resize();updateStatus();
+  if(!assembled){assembled=true;assemble();}
  }catch(error){console.warn('Liquid Type graphics:',error);showFailure('Die interaktive Grafik ist gerade nicht verfügbar. Bitte versuche es mit aktivierter Hardwarebeschleunigung in einem aktuellen Browser.');}
 }
 // A slow device turned a quality dial down: draw fewer pixels, or rebuild
@@ -568,7 +994,8 @@ function resize(){
 input.addEventListener('input',()=>{clearTimeout(textTimer);$('charCount').textContent=Array.from(input.value).length+' / 32';textTimer=setTimeout(()=>setText(input.value),130);});
 input.addEventListener('keydown',e=>{if(e.key==='Enter'){clearTimeout(textTimer);setText(input.value);input.blur();}});
 $('pause').addEventListener('click',()=>setPaused(!paused));
-$('reset').addEventListener('click',()=>{fluid?.reset();pointer.down=false;draw();});
+// With the effect on, resetting lets the letters condense anew.
+$('reset').addEventListener('click',()=>{fluid?.reset();pointer.down=false;drip=null;burstUntil=0;if(!assemble())draw();});
 $('recover').addEventListener('click',()=>location.reload());
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();showFailure('Die Grafikverbindung wurde unterbrochen. Sie wird automatisch wiederhergestellt, sobald dein Browser bereit ist.');});
 canvas.addEventListener('webglcontextrestored',()=>{w=0;h=0;setup();});
@@ -579,18 +1006,30 @@ function move(e){
   if(pointer.down)disturb(x,y,dx*16*parameters.strength,dy*16*parameters.strength,pointer.radius);
   else if(e.pointerType==='mouse'&&Math.hypot(dx,dy)<100)disturb(x,y,dx*2.5*parameters.strength,dy*2.5*parameters.strength,pointer.radius*.65);
  }
- pointer.x=x;pointer.y=y;pointer.last=now;cursor.style.left=x+'px';cursor.style.top=y+'px';
- if(e.pointerType==='mouse'&&!failed)cursor.style.display='grid';
+ // A press that moves is a drag, not a hold.
+ if(pointer.down&&!pointer.dragged&&Math.hypot(e.clientX-pointer.startX,e.clientY-pointer.startY)>8){pointer.dragged=true;clearTimeout(holdTimer);}
+ magnetOn=effects.magnet&&!pointer.down&&e.pointerType==='mouse'&&!!liquidArea&&x>liquidArea.left&&x<liquidArea.right&&y>liquidArea.top&&y<liquidArea.bottom;
+ magnet.x=x;magnet.y=y;
+ pointer.x=x;pointer.y=y;pointer.last=now;idleSince=now;cursor.style.left=x+'px';cursor.style.top=y+'px';
+ // The liquid drop replaces the drawn ring while it is on.
+ if(e.pointerType==='mouse'&&!failed)cursor.style.display=effects.cursor&&liquidCursor.ready?'none':'grid';
 }
-canvas.addEventListener('pointerdown',e=>{if(pointer.id!==null||failed)return;move(e);pointer.id=e.pointerId;pointer.down=!paused;canvas.setPointerCapture(e.pointerId);cursor.classList.toggle('dragging',pointer.down);});
+canvas.addEventListener('pointerdown',e=>{
+ if(pointer.id!==null||failed)return;
+ move(e);Object.assign(pointer,{id:e.pointerId,down:!paused,startX:e.clientX,startY:e.clientY,dragged:false});magnetOn=false;
+ canvas.setPointerCapture(e.pointerId);cursor.classList.toggle('dragging',pointer.down);
+ // Holding still gathers the liquid under the pointer, then it bursts.
+ clearTimeout(holdTimer);
+ if(pointer.down&&effects.burst)holdTimer=setTimeout(()=>{if(pointer.down&&!pointer.dragged)burstAt(pointer.x,pointer.y);},FX.holdMs);
+});
 canvas.addEventListener('pointermove',e=>{if(pointer.id!==null&&e.pointerId!==pointer.id)return;move(e);});
-function release(e){if(pointer.id!==null&&e.pointerId!==pointer.id)return;pointer.down=false;pointer.id=null;cursor.classList.remove('dragging');}
+function release(e){if(pointer.id!==null&&e.pointerId!==pointer.id)return;clearTimeout(holdTimer);pointer.down=false;pointer.id=null;pointer.dragged=false;cursor.classList.remove('dragging');}
 canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('lostpointercapture',release);
-canvas.addEventListener('pointerleave',()=>{cursor.style.display='none';if(!pointer.down)pointer.last=0;});
+canvas.addEventListener('pointerleave',()=>{cursor.style.display='none';magnetOn=false;if(!pointer.down)pointer.last=0;});
 canvas.addEventListener('keydown',e=>{
  if(e.key===' '){e.preventDefault();setPaused(!paused);return;}
  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
-  e.preventDefault();if(fluid&&!paused){const dx=e.key==='ArrowLeft'?-420:e.key==='ArrowRight'?420:0,dy=e.key==='ArrowUp'?-420:e.key==='ArrowDown'?420:0;fluid.impulse(w/2,h/2,dx,dy,Math.max(w,h));}
+  e.preventDefault();idleSince=performance.now();if(fluid&&!paused){const dx=e.key==='ArrowLeft'?-420:e.key==='ArrowRight'?420:0,dy=e.key==='ArrowUp'?-420:e.key==='ArrowDown'?420:0;fluid.impulse(w/2,h/2,dx,dy,Math.max(w,h));}
  }
 });
 let previousScroll=scrollY;
@@ -598,13 +1037,14 @@ window.addEventListener('scroll',()=>{
  const delta=Math.max(-100,Math.min(100,scrollY-previousScroll));previousScroll=scrollY;
  if(!fluid||paused||failed)return;
  const rect=canvas.getBoundingClientRect();if(rect.bottom<0||rect.top>innerHeight)return;
+ idleSince=performance.now();
  for(let i=0;i<fluid.n;i++){
   fluid.vy[i]=Math.max(-1100,Math.min(1100,fluid.vy[i]-delta*3.2*parameters.strength*(.65+.35*Math.sin(fluid.tx[i]/w*Math.PI))));
   fluid.vx[i]+=Math.sin(fluid.tx[i]*.022)*delta*.18;
  }
 },{passive:true});
 new ResizeObserver(()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{try{resize();}catch{showFailure('Die Grafik konnte nicht angepasst werden. Bitte lade die Ansicht neu.');}},100);}).observe(wrap);
-document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;pointer.down=false;pointer.id=null;cursor.classList.remove('dragging');quality?.reset();});
+document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;clearTimeout(holdTimer);pointer.down=false;pointer.id=null;cursor.classList.remove('dragging');resetMotion();quality?.reset();});
 reduced.addEventListener('change',e=>{if(e.matches)setPaused(true);});
 function frame(t){
  requestAnimationFrame(frame);
@@ -614,32 +1054,161 @@ function frame(t){
  // With fewer particles chosen for a slow processor, a late frame no longer
  // catches up the full time: the liquid briefly slows instead of stuttering.
  const work=performance.now(),cap=(quality?.level.part??0)>=2?1/40:.04;
+ settleMotion(t);idleMotion(t);dripsAndBursts(t);
  accumulator=Math.min(cap,accumulator+dt);
+ // A pressed pointer drags the liquid; a hovering mouse over the text draws
+ // it near like a magnet. Settling phases blend in after a burst or while
+ // the letters condense.
+ magnet.radius=letterSize*FX.magnetRadius;
+ const brush=pointer.down?pointer:magnetOn&&effects.magnet?magnet:null;
+ const prm=brush===magnet?{...parameters,strength:FX.magnetStrength}:settle.params(parameters,t);
  while(accumulator>=1/120){
   const tick=1/120;
-  fluid.step(tick,parameters,pointer);accumulator-=tick;
+  fluid.step(tick,prm,brush);accumulator-=tick;
  }
+ liquidCursor.sync(t);
  draw();
  quality?.frame(interval,performance.now()-work);
 }
+// --------------------------------------------------------------- effects ---
+// The letters condense from scattered drops instead of simply appearing.
+// Returns whether they do.
+function assemble(){
+ if(!fluid?.n||!effects.assemble||reduced.matches||paused||failed)return false;
+ scatterAround(fluid,Math.min(w,h)*FX.assembleSpread);
+ const now=performance.now();idleSince=now;settle.start(now,FX.assembleMs,{viscosity:.3,attraction:.5,homing:2});
+ draw();return true;
+}
+// Everything flies away from the press point; the springs let go for a moment.
+function burstAt(x,y){
+ if(!fluid||paused)return;
+ const now=performance.now();
+ burstFrom(fluid,x,y,FX.burstSpeed);
+ if(!reduced.matches){fluid.free.fill(1);burstUntil=now+FX.burstFreeMs;drip=null;}
+ pointer.down=false;pointer.dragged=true;cursor.classList.remove('dragging');idleSince=now;
+ settle.start(now,FX.burstFreeMs+2600,{homing:2.5});
+ try{navigator.vibrate?.(20);}catch{/* optional */}
+}
+// Every few quiet seconds a drop detaches from the lowest edge, falls and
+// is pulled back; the springs of a burst catch again after a moment.
+function dripsAndBursts(t){
+ if(burstUntil&&t>burstUntil){fluid.free.fill(0);burstUntil=0;}
+ if(drip){if(t>drip.until){for(const i of drip.indices)fluid.free[i]=0;drip=null;nextDrip=t+FX.dripMin+Math.random()*(FX.dripMax-FX.dripMin);}}
+ else if(t>nextDrip){
+  if(effects.drips&&!reduced.matches&&!pointer.down&&!burstUntil&&isCalm(fluid)){
+   const indices=dripIndices(fluid,FX.dripSize);
+   for(const i of indices)fluid.free[i]=1;
+   drip=indices.length?{indices,until:t+FX.dripFallMs}:null;
+  }else nextDrip=t+800;
+ }
+}
+// After a quiet moment an invisible hand drifts through the text.
+function idleMotion(t){
+ if(!effects.idle||reduced.matches||pointer.down||!centre||t-idleSince<FX.idleDelay){ghost=null;return;}
+ const {x,y}=idleHand(centre,(t-idleSince-FX.idleDelay)/1000);
+ if(ghost)disturb(x,y,(x-ghost.x)*FX.idleForce*parameters.strength,(y-ghost.y)*FX.idleForce*parameters.strength,pointer.radius*.6);
+ ghost={x,y};
+}
+// Phone motion (see MotionReader): a shake or a quick tilt sloshes the
+// liquid, holding the phone still does nothing lasting. Android delivers
+// data at once; iOS asks for permission when the switch is tapped.
+const motion={reader:new MotionReader(),active:false,waiting:0,listening:false};
+const screenAngle=()=>screen.orientation?.angle??window.orientation??0;
+screen.orientation?.addEventListener?.('change',()=>motion.reader.relearn());window.addEventListener('orientationchange',()=>motion.reader.relearn());
+function onMotion(e){
+ const now=performance.now(),r=motion.reader.read(e,now,screenAngle(),{shake:FX.shakeGain,tilt:FX.tiltGain,lean:FX.leanGain});
+ if(!r)return;
+ if(!motion.active){motion.active=true;clearTimeout(motion.waiting);note();}
+ if(r.first)return;
+ if(r.aligned&&fluid&&!paused&&!document.hidden&&Math.hypot(r.nudge.x,r.nudge.y)>1.5){fluid.nudge(r.nudge.x,r.nudge.y);idleSince=now;}
+ parameters.gravityX=r.aligned?r.lean.x:0;parameters.gravityY=r.aligned?r.lean.y:0;
+}
+// Without fresh sensor data the lean must not linger.
+function settleMotion(t){if(motion.reader.last&&t-motion.reader.last>300)parameters.gravityX=parameters.gravityY=0;}
+function resetMotion(){parameters.gravityX=parameters.gravityY=0;motion.reader.reset();}
+function listenMotion(on){
+ window.removeEventListener('devicemotion',onMotion);motion.listening=on;
+ if(on)window.addEventListener('devicemotion',onMotion,{passive:true});else{clearTimeout(motion.waiting);resetMotion();}
+}
+// Switching the sensor on is the user gesture iOS needs; within a moment it
+// shows whether the browser delivers motion data at all.
+function requestMotion(){
+ const ask=typeof DeviceMotionEvent.requestPermission==='function'?DeviceMotionEvent.requestPermission():Promise.resolve('granted');
+ return ask.then(state=>{
+  if(state!=='granted'){setEffect('motion',false);note('Der Browser hat die Bewegungsdaten nicht freigegeben.');return;}
+  listenMotion(true);clearTimeout(motion.waiting);
+  motion.waiting=setTimeout(()=>{if(!motion.active){setEffect('motion',false);note('Dieser Browser liefert keine Bewegungsdaten.');}},2500);
+ }).catch(()=>{setEffect('motion',false);note('Bewegungsdaten sind hier nicht verfügbar.');});
+}
+function note(text=''){$('effectNote').textContent=text;$('effectNote').hidden=!text;}
+// The pointer's liquid drop over the stage (see cursor.mjs): it swells with
+// speed and, near the letters, melts into the liquid wherever it flows.
+const coarsePointer=matchMedia('(pointer: coarse)').matches;
+const ink=(()=>{const m=getComputedStyle(document.documentElement).getPropertyValue('--ink').trim().match(/^#([0-9a-f]{6})$/i);return m?[0,2,4].map(i=>parseInt(m[1].slice(i,i+2),16)/255):[0,0,0];})();
+const liquidCursor=new LiquidCursor({
+ host:wrap,ink,reduced,
+ liquid:()=>effects.cursor&&fluid?.n&&!paused&&!failed?{fluid,canvas}:null,
+ radius:()=>Math.max(coarsePointer?34:18,letterSize*FX.cursorSize),
+ options:()=>({count:6,follow:.15,wobble:.4,rest:.05,decay:.995,taper:.7,reach:4,overlap:1.5,meltIn:.33,meltOut:.33,merge:3,line:1,bridge:1}),
+});
+// The switches below the sliders.
+const effectButtons=[...document.querySelectorAll('[data-effect]')];
+function setEffect(name,on){
+ effects[name]=!!on;
+ for(const b of effectButtons)if(b.dataset.effect===name)b.setAttribute('aria-pressed',String(!!on));
+ if(name==='cursor'){liquidCursor.enabled=on;if(!on)draw();}
+ if(name==='magnet'&&!on)magnetOn=false;
+ if(name==='idle'&&!on)ghost=null;
+ if(name==='motion'&&!on&&motion.listening)listenMotion(false);
+}
+const motionPossible=(navigator.maxTouchPoints>0||coarsePointer)&&'DeviceMotionEvent' in window;
+const motionNeedsAsking=motionPossible&&typeof DeviceMotionEvent.requestPermission==='function';
+for(const b of effectButtons){
+ const name=b.dataset.effect;
+ // The magnet needs a mouse, the sensor a phone.
+ if(name==='magnet')b.hidden=!matchMedia('(hover: hover)').matches;
+ if(name==='motion')b.hidden=!motionPossible;
+ b.addEventListener('click',()=>{
+  const on=!effects[name];note();
+  if(name==='motion'&&on){setEffect('motion',true);requestMotion();return;}
+  setEffect(name,on);
+  if(name==='assemble'&&on)assemble();
+ });
+}
+// Android delivers motion data without asking, so the sensor starts switched
+// on; a touch screen without sensor switches it off again after a moment.
+if(motionPossible&&!motionNeedsAsking&&!reduced.matches){
+ setEffect('motion',true);listenMotion(true);
+ motion.waiting=setTimeout(()=>{if(!motion.active)setEffect('motion',false);},2500);
+}
+// With ?debug the running simulation is reachable from the console.
+if(new URLSearchParams(location.search).has('debug'))window.liquidType={get fluid(){return fluid;},get renderer(){return renderer;},get parameters(){return parameters;},get effects(){return effects;},get cursor(){return liquidCursor.chain;},get drip(){return drip;},get motion(){return motion;},setEffect};
+
 setup();updateStatus();requestAnimationFrame(frame);
 // Expose the same visible controls to compatible browsers; no network or storage.
 if(document.modelContext?.registerTool){
  const lifecycle=new AbortController();
  try{Promise.resolve(document.modelContext.registerTool({
-  name:'configure_liquid_type',title:'Flüssigkeitsschrift einstellen',description:'Ändert den sichtbaren Text, die Physikregler oder den Pausenstatus der lokalen Animation.',
-  inputSchema:{type:'object',properties:{text:{type:'string',maxLength:32},viscosity:{type:'number',minimum:0,maximum:100},tension:{type:'number',minimum:0,maximum:100},attraction:{type:'number',minimum:0,maximum:100},strength:{type:'number',minimum:0,maximum:100},paused:{type:'boolean'}},additionalProperties:false},
+  name:'configure_liquid_type',title:'Flüssigkeitsschrift einstellen',description:'Ändert den sichtbaren Text, die Physikregler, die Effekte oder den Pausenstatus der lokalen Animation.',
+  inputSchema:{type:'object',properties:{text:{type:'string',maxLength:32},viscosity:{type:'number',minimum:0,maximum:100},tension:{type:'number',minimum:0,maximum:100},attraction:{type:'number',minimum:0,maximum:100},strength:{type:'number',minimum:0,maximum:100},paused:{type:'boolean'},
+   effects:{type:'object',description:'Effekte ein- oder ausschalten.',properties:Object.fromEntries(EFFECTS.map(k=>[k,{type:'boolean'}])),additionalProperties:false}},additionalProperties:false},
   annotations:{readOnlyHint:false,untrustedContentHint:false},
   execute(value){
    if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('Ein Einstellungsobjekt wird benötigt.');
-   for(const key of Object.keys(value))if(![...controls,'text','paused'].includes(key))throw new Error('Unbekannte Einstellung.');
+   for(const key of Object.keys(value))if(![...controls,'text','paused','effects'].includes(key))throw new Error('Unbekannte Einstellung.');
+   if(value.effects!==undefined){
+    if(!value.effects||typeof value.effects!=='object'||Array.isArray(value.effects))throw new Error('effects muss ein Objekt sein.');
+    for(const [k,v] of Object.entries(value.effects))if(!EFFECTS.includes(k)||typeof v!=='boolean')throw new Error('Unbekannter Effekt oder kein Wahrheitswert.');
+   }
    if(value.text!==undefined&&(typeof value.text!=='string'||Array.from(value.text).length>32))throw new Error('Text darf höchstens 32 Zeichen enthalten.');
    for(const key of controls)if(value[key]!==undefined&&(typeof value[key]!=='number'||!Number.isFinite(value[key])||value[key]<0||value[key]>100))throw new Error('Regler müssen zwischen 0 und 100 liegen.');
    if(value.paused!==undefined&&typeof value.paused!=='boolean')throw new Error('paused muss ein Wahrheitswert sein.');
    if(value.text!==undefined){clearTimeout(textTimer);setText(value.text);}
    for(const key of controls)if(value[key]!==undefined)setParameter(key,value[key]);
    if(value.paused!==undefined)setPaused(value.paused);
-   return{text:input.value,paused,particles:fluid?.n??0,...Object.fromEntries(controls.map(k=>[k,Number($(k).value)]))};
+   // The phone sensor only starts from a tap (iOS asks then); here it can only be switched off.
+   for(const [k,v] of Object.entries(value.effects||{}))if(k!=='motion'||!v)setEffect(k,v);
+   return{text:input.value,paused,particles:fluid?.n??0,...Object.fromEntries(controls.map(k=>[k,Number($(k).value)])),effects:{...effects}};
   }
  },{signal:lifecycle.signal})).catch(()=>{});}catch{/* Optional browser API; the visible controls remain available. */}
  window.addEventListener('pagehide',()=>lifecycle.abort(),{once:true});

@@ -43,6 +43,19 @@
    </div>
   </div>
   <div class="actions"><button id="pause" type="button" aria-pressed="false"><span id="pauseIcon" aria-hidden="true">Ⅱ</span><span id="pauseLabel">Pause</span></button><button id="reset" type="button"><span aria-hidden="true">↺</span> Zurücksetzen</button></div>
+  <div class="effects" role="group" aria-labelledby="effectsLabel">
+   <div class="section-label"><span id="effectsLabel">03 / DIE EFFEKTE</span><span>EINZELN AN- UND AUSSCHALTEN</span></div>
+   <div class="effect-list">
+    <button class="effect" type="button" data-effect="cursor" aria-pressed="true"><i aria-hidden="true"></i>Tropfen am Zeiger</button>
+    <button class="effect" type="button" data-effect="magnet" aria-pressed="true"><i aria-hidden="true"></i>Magnet</button>
+    <button class="effect" type="button" data-effect="burst" aria-pressed="true"><i aria-hidden="true"></i>Halten lässt platzen</button>
+    <button class="effect" type="button" data-effect="drips" aria-pressed="true"><i aria-hidden="true"></i>Tropfen fallen</button>
+    <button class="effect" type="button" data-effect="idle" aria-pressed="true"><i aria-hidden="true"></i>Unsichtbare Hand</button>
+    <button class="effect" type="button" data-effect="assemble" aria-pressed="true"><i aria-hidden="true"></i>Zusammensetzen</button>
+    <button class="effect" type="button" data-effect="motion" aria-pressed="false" hidden><i aria-hidden="true"></i>Bewegungssensor</button>
+   </div>
+   <p class="effect-note" id="effectNote" role="status" hidden></p>
+  </div>
  </section>
  <footer class="bottom"><span>TYPE IS NO LONGER STILL.</span><p>Eine spielerische 2D-Flüssigkeitssimulation.<br>Mit Kohäsion, Trägheit und einem Gedächtnis für Buchstaben.</p><span class="footer-mark" aria-hidden="true">lt.</span></footer>
 </main>

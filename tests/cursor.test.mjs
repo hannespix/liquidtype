@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DropChain} from '../src/MS/cursor.mjs';
+import {DropChain} from '../src/cursor.mjs';
 
 const R=24,step=1/60;
 const run=(chain,frames,move=null,near=null)=>{for(let i=0;i<frames;i++){if(move)move(i);chain.advance(step,near,R);}};

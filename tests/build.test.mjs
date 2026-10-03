@@ -11,7 +11,16 @@ test('build emits a parseable fully offline document',()=>{
  assert.ok(!/^\s*(import |export )/m.test(js));
  assert.ok(js.includes('function sampleGlyphs('),'shared glyph sampler is inlined');
  for(const m of html.matchAll(/(?:src|href)="([^"]+)"/g))assert.ok(m[1].startsWith('#')||m[1].startsWith('data:'),m[1]);
- for(const name of ['index.html','404.html','style.css','app.mjs','physics.mjs','render.mjs','glyphs.mjs','quality.mjs'])assert.ok(fs.existsSync('dist/'+name),name);
+ for(const name of ['index.html','404.html','style.css','app.mjs','physics.mjs','render.mjs','glyphs.mjs','quality.mjs','sensors.mjs','cursor.mjs','effects.mjs'])assert.ok(fs.existsSync('dist/'+name),name);
+});
+test('the offline document declares every top-level name once',()=>{
+ // All modules share one scope there; a second function of the same name
+ // would silently replace the first instead of failing.
+ const js=fs.readFileSync('Liquid-Type-Offline.html','utf8').match(/<script>\n([\s\S]*?)<\/script>/)[1];
+ const names=[...js.matchAll(/^(?:async )?(?:function\*? |class |const |let )([\w$]+)/gm)].map(m=>m[1]);
+ const twice=names.filter((n,i)=>names.indexOf(n)!==i);
+ assert.deepEqual(twice,[]);
+ assert.ok(names.includes('LiquidCursor')&&names.includes('MotionReader')&&names.includes('burstFrom'),'shared effect modules are inlined');
 });
 test('MS subpage is built with its font and licence',()=>{
  for(const name of ['index.html','style.css','ms.mjs','fonts/playfair-display-700-latin.woff2','fonts/OFL.txt'])assert.ok(fs.existsSync('dist/MS/'+name),name);
