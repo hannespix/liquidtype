@@ -1,11 +1,11 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=661453e8';
-import {FluidRenderer} from '../render.mjs?v=661453e8';
-import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=661453e8';
-import {matchPoints} from './match.mjs?v=661453e8';
-import {restrain,sagWeight} from './coupling.mjs?v=661453e8';
-import {createQuality} from '../quality.mjs?v=661453e8';
-import {Upright} from './sensors.mjs?v=661453e8';
+import {Fluid} from '../physics.mjs?v=174b84c3';
+import {FluidRenderer} from '../render.mjs?v=174b84c3';
+import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=174b84c3';
+import {matchPoints} from './match.mjs?v=174b84c3';
+import {restrain,sagWeight} from './coupling.mjs?v=174b84c3';
+import {createQuality} from '../quality.mjs?v=174b84c3';
+import {Upright} from './sensors.mjs?v=174b84c3';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),intro=$('intro'),back=$('back'),crumb=$('crumb'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -620,7 +620,14 @@ function plainShow(name,focus){
   requestAnimationFrame(()=>{if(entry?.shape)arriveFrom(entry);else{rebuild();scatter();}});
  }
  scheduleGrid();
- if(focus)(name==='home'?letters[0]:views.get(name).querySelector('h2'))?.focus({preventScroll:true});
+ if(focus){if(name==='home')quietFocus(letters[0]);else views.get(name).querySelector('h2')?.focus({preventScroll:true});}
+}
+// Focus the page moves itself shows no focus mark (keyboard users still land
+// on the letter); the mark returns with the next keyboard step.
+function quietFocus(el){
+ if(!el)return;
+ el.dataset.quietFocus='';el.addEventListener('blur',()=>{delete el.dataset.quietFocus;},{once:true});
+ el.focus({preventScroll:true});
 }
 function go(name){
  if(name===current)return;
