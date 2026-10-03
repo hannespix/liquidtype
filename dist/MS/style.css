@@ -38,6 +38,7 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 /* Liquid hand-over: the target view lies over the home view while the
    initials flow into its heading; then heading and text take over. */
 .view.is-arriving{position:absolute;top:0;left:0;right:0;z-index:2;animation:none}
+.view.is-handed{animation:none}
 .view.is-arriving .panel{opacity:0}
 .view.is-arriving.is-revealed .panel{opacity:1;transition:opacity .35s var(--ease)}
 .view-home.is-leaving .home{opacity:0;transition:opacity .25s}
@@ -74,6 +75,10 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .line svg{position:absolute;left:0;top:-200px;width:100vw;height:400px;overflow:visible;pointer-events:none}
 .line path{fill:none;stroke:var(--ink);stroke-width:1}
 .line-hit{position:absolute;z-index:1;left:0;top:-18px;height:36px;touch-action:none}
+.line.is-gliding svg{visibility:hidden}
+/* The line that glides between two pages' lines while the page changes */
+.glide-line{position:fixed;z-index:3;left:0;top:0;height:400px;overflow:visible;pointer-events:none}
+.glide-line path{fill:none;stroke:var(--ink);stroke-width:1}
 
 /* Content panels */
 .panel{width:100%;max-width:38rem}
