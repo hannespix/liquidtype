@@ -73,7 +73,7 @@ Unter `/MS/` liegt eine Studie der Website von Matthias Sütterlin (Innenarchite
 - Text lässt sich auf der Seite nirgends markieren, damit beim Ziehen an der Flüssigkeit keine Auswahl im Hintergrund entsteht.
 - Gedrückt halten sammelt die Flüssigkeit am Finger und lässt sie dann platzen; sie findet von selbst wieder zusammen.
 - Alle paar ruhigen Sekunden löst sich ein Tropfen vom unteren Rand, fällt auf die Linie und lässt sie nachschwingen.
-- Ein Mauszeiger zwischen M und S zieht die Flüssigkeit beider Buchstaben zu sich, bis eine Tropfenkette entsteht.
+- Wo der Mauszeiger über den flüssigen Buchstaben steht, zieht er die Flüssigkeit wie ein Magnet zu sich, über M und S und dazwischen, wo eine Tropfenkette zwischen beiden entsteht.
 - Dunkler Modus nach Systemeinstellung: helle Flüssigkeit auf Schwarz.
 - Ohne WebGL2 erscheinen die Initialen als normale Schrift.
 
