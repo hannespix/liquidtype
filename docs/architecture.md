@@ -36,6 +36,8 @@ Alle Stellgrößen der Effekte liegen in einem Objekt `tune` (Vorgaben in `defau
 
 Bewegungssensoren wirken nur über Änderungen: Die lineare Beschleunigung wird pro Ereignis in einen Geschwindigkeitsschub integriert (`nudge`, leicht über die Glyphe variiert, damit es schwappt statt zu schieben), die Änderung der Schwerkraftrichtung ergibt einen weiteren Schub, und eine schwache Kraft zur aktuellen Neigung klingt innerhalb von zwei Sekunden ab. Eine ruhig gehaltene Schräglage erzeugt deshalb keinen dauerhaften Fluss. Alles wird nach Bildschirmausrichtung gedreht und pro Ereignis begrenzt; bleiben Sensordaten aus, fällt die Restkraft auf null.
 
+Geräte und Browser melden die Achsen unterschiedlich: iOS mit umgekehrten Vorzeichen, manche Geräte und Browser um eine Vierteldrehung versetzt. `src/MS/sensors.mjs` lernt deshalb die Ausrichtung aus den ersten ruhigen Messungen eines deutlich geneigten Handys (mindestens rund 25 Grad aus der Waagerechten, zehn Messungen ohne Ausreißer). Weil man ein Handy mit aufrechter Seite hält, muss die Schwerkraft dann zum unteren Bildschirmrand zeigen. Alle Messungen werden um die Vierteldrehungen gedreht, die das herstellen; auf einem Gerät nach Spezifikation sind das null. Bis die Ausrichtung feststeht, bewegen die Sensoren nichts; ein flach liegendes Handy behält nach 1,5 Sekunden die Standardausrichtung. Nach jeder Drehung des Bildschirms lernt die Seite neu. `tests/sensors.test.mjs` prüft vier Gerätearten.
+
 Wenn `EXT_color_buffer_float` verfügbar ist, verwendet die Summentextur RGBA16F; andernfalls RGBA8. Die Schrift wird ausschließlich über denselben Partikel-Renderpfad ausgegeben. Die Materialmaske wird nicht als separate Schriftebene angezeigt.
 
 ## Schwache und ältere Geräte
