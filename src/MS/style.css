@@ -100,6 +100,7 @@ a{color:inherit;text-decoration:underline;text-decoration-thickness:1.2px;text-u
 .project:hover .project-meta,.project:focus-visible .project-meta{opacity:1}
 .address{margin:0 0 1em;font-style:normal;font-size:1.15rem;line-height:1.85}
 .debug{position:fixed;z-index:30;right:1rem;bottom:1rem;margin:0;padding:.5rem .7rem;max-width:calc(100% - 2rem);background:rgba(0,0,0,.8);color:#fff;font:11px/1.5 monospace;white-space:pre-wrap;pointer-events:none}
+.debug-press{bottom:auto;top:3.5rem}
 /* Tuning: a quiet round button and a frosted sheet with large touch targets */
 .tune-toggle{position:fixed;z-index:40;left:max(1rem,env(safe-area-inset-left));bottom:max(1rem,env(safe-area-inset-bottom));width:44px;height:44px;border-radius:50%;border:1px solid color-mix(in srgb,var(--ink) 12%,transparent);background:color-mix(in srgb,var(--paper) 72%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);box-shadow:0 6px 20px rgba(0,0,0,.10);opacity:.55;transition:opacity .2s,transform .2s var(--ease)}
 .tune-toggle:hover,.tune-toggle:focus-visible,.tune-toggle[aria-expanded="true"]{opacity:1}

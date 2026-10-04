@@ -16,7 +16,7 @@ const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 const controls=['viscosity','tension','attraction','strength'];
 const parameters={viscosity:.35,tension:.65,attraction:.5,strength:1.3,gravityX:0,gravityY:0,dripGravity:1400};
 let renderer=null,fluid=null,paused=reduced.matches,failed=false,w=0,h=0,last=0,accumulator=0,textTimer,resizeTimer,quality=null;
-const pointer={x:-1000,y:-1000,down:false,radius:95,id:null,last:0,startX:0,startY:0,dragged:false,burst:false,cx:0,cy:0};
+const pointer={x:-1000,y:-1000,down:false,radius:95,id:null,type:'',last:0,startX:0,startY:0,dragged:false,burst:false,cx:0,cy:0,since:0};
 // The effects of the MS page, each switchable in the controls. Their dials
 // are the MS page's tuned values (see `defaults` in src/MS/ms.mjs): idle hand,
 // letters condensing from a cloud, hold to burst, drips from the lowest
@@ -142,7 +142,7 @@ function move(e){
 }
 canvas.addEventListener('pointerdown',e=>{
  if(pointer.id!==null||failed)return;
- move(e);Object.assign(pointer,{id:e.pointerId,cx:e.clientX,cy:e.clientY,burst:false});magnetOn=false;
+ move(e);Object.assign(pointer,{id:e.pointerId,type:e.pointerType,cx:e.clientX,cy:e.clientY,burst:false});magnetOn=false;
  canvas.setPointerCapture(e.pointerId);
  if(paused){pointer.down=false;pointer.dragged=false;}else pressAgain(false);
 });
@@ -151,13 +151,22 @@ canvas.addEventListener('pointerdown',e=>{
 // (`dragging`), and holding still until the letters are back starts a fresh
 // press, so holding on bursts them again.
 function pressAgain(dragging){
- Object.assign(pointer,{down:true,dragged:dragging,startX:pointer.cx,startY:pointer.cy});cursor.classList.add('dragging');
+ Object.assign(pointer,{down:true,dragged:dragging,startX:pointer.cx,startY:pointer.cy,since:performance.now()});cursor.classList.add('dragging');
  clearTimeout(holdTimer);
  if(!dragging&&effects.burst)holdTimer=setTimeout(()=>{if(pointer.down&&!pointer.dragged)burstAt(pointer.x,pointer.y);},FX.holdMs);
 }
+// Phones have a long press of their own (about 400 ms on Android): a context
+// menu, or the browser taking the touch over with pointercancel. It may come
+// before holdMs and would swallow the hold, so a finger held still for most
+// of holdMs bursts right then.
+function longPress(){
+ if(!effects.burst||!pointer.down||pointer.dragged||pointer.type==='mouse'||performance.now()-pointer.since<FX.holdMs*.6)return;
+ clearTimeout(holdTimer);burstAt(pointer.x,pointer.y);
+}
+canvas.addEventListener('contextmenu',e=>{if(pointer.id!==null&&pointer.type!=='mouse'){e.preventDefault();longPress();}});
 canvas.addEventListener('pointermove',e=>{if(pointer.id!==null&&e.pointerId!==pointer.id)return;move(e);});
 function release(e){if(pointer.id!==null&&e.pointerId!==pointer.id)return;clearTimeout(holdTimer);pointer.down=false;pointer.id=null;pointer.dragged=false;pointer.burst=false;cursor.classList.remove('dragging');}
-canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('lostpointercapture',release);
+canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',e=>{if(e.pointerId===pointer.id)longPress();release(e);});canvas.addEventListener('lostpointercapture',release);
 canvas.addEventListener('pointerleave',()=>{cursor.style.display='none';magnetOn=false;if(!pointer.down)pointer.last=0;});
 canvas.addEventListener('keydown',e=>{
  if(e.key===' '){e.preventDefault();setPaused(!paused);return;}
