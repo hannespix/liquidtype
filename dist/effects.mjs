@@ -25,11 +25,13 @@ export function burstFrom(fluid,x,y,speed,random=Math.random){
   fluid.vx[i]=Math.max(-1500,Math.min(1500,fluid.vx[i]+dx/d*v));fluid.vy[i]=Math.max(-1500,Math.min(1500,fluid.vy[i]+dy/d*v));
  }
 }
-// Whether the liquid has come to rest: mean speed of a sample below `limit` px/s.
-export function isCalm(fluid,limit=25){
+// Mean speed of the liquid in px/s, from a sample of its particles.
+export function meanSpeed(fluid){
  let sum=0,count=0;for(let i=0;i<fluid.n;i+=37){sum+=Math.hypot(fluid.vx[i],fluid.vy[i]);count++;}
- return count===0||sum/count<limit;
+ return count?sum/count:0;
 }
+// Whether the liquid has come to rest: mean speed below `limit` px/s.
+export function isCalm(fluid,limit=25){return meanSpeed(fluid)<limit;}
 // The particles of one drop, `size` lattice steps across, at a random spot
 // of the letters' lowest edge (by their targets); empty for an empty fluid.
 export function dripIndices(fluid,size,random=Math.random){

@@ -56,7 +56,7 @@ Der Generator hat dieselben Effekte wie die MS-Seite, mit deren abgestimmten Wer
 - **Zusammensetzen** – beim Laden und beim Zurücksetzen bildet sich die Schrift aus verstreuten Tropfen.
 - **Bewegungssensor** – am Smartphone schwappt die Schrift beim Schütteln und schnellen Kippen. Android liefert die Daten sofort, iOS fragt beim Einschalten nach Erlaubnis.
 
-Bei reduzierter Bewegung (Systemeinstellung) ruht die Animation wie bisher. Die WebMCP-Anbindung kann die Effekte ebenfalls schalten; den Bewegungssensor nur aus, weil iOS zum Einschalten ein Antippen verlangt.
+Scroll-Welle und Handy-Schübe wirken im Verhältnis zur Schriftgröße: Kleine Schrift am Handy schwappt so stark wie große am Desktop, statt zu einem Strich zerquetscht zu werden. Kommt die Flüssigkeit fast zur Ruhe, zeichnet die Seite sie wieder als scharfe Schrift, statt sie wegen leichten Nachzitterns fett und verschmiert zu lassen; dünne Striche quellen in Bewegung etwas weniger auf. Bei reduzierter Bewegung (Systemeinstellung) ruht die Animation wie bisher. Die WebMCP-Anbindung kann die Effekte ebenfalls schalten; den Bewegungssensor nur aus, weil iOS zum Einschalten ein Antippen verlangt.
 
 ## Schwache und ältere Geräte
 

@@ -4,7 +4,7 @@ import {sampleGlyphs} from './glyphs.mjs';
 import {createQuality} from './quality.mjs';
 import {MotionReader} from './sensors.mjs';
 import {LiquidCursor} from './cursor.mjs';
-import {scatterAround,burstFrom,isCalm,dripIndices,Settle,idleHand} from './effects.mjs';
+import {scatterAround,burstFrom,isCalm,meanSpeed,dripIndices,Settle,idleHand} from './effects.mjs';
 const $=id=>document.getElementById(id);
 const canvas=$('fluid'),wrap=$('canvasWrap'),input=$('textInput'),cursor=$('cursor');
 // No alternate text layer: the only visible typography is the particle surface.
@@ -22,10 +22,14 @@ const pointer={x:-1000,y:-1000,down:false,radius:95,id:null,last:0,startX:0,star
 // letters condensing from a cloud, hold to burst, drips from the lowest
 // edge, the magnet, phone motion and the pointer's liquid drop.
 const FX={idleDelay:4000,idleForce:1.4,assembleSpread:.22,assembleMs:2200,holdMs:450,burstSpeed:1200,burstFreeMs:300,
- dripMin:6000,dripMax:11000,dripFallMs:1300,dripSize:2.3,magnetStrength:2.2,magnetRadius:.26,shakeGain:650,tiltGain:90,leanGain:120,cursorSize:.08};
+ dripMin:6000,dripMax:11000,dripFallMs:1300,dripSize:2.3,magnetStrength:2.2,magnetRadius:.26,shakeGain:650,tiltGain:90,leanGain:120,cursorSize:.08,
+ // Scroll waves and phone pushes act in proportion to the text: full at
+ // this letter size (px) and above, weaker for smaller text, so small text on
+ // a phone sloshes as much, relatively, as large text on a desktop.
+ impulseSize:240};
 const effects={cursor:true,magnet:true,burst:true,drips:true,idle:true,assemble:true,motion:false},EFFECTS=Object.keys(effects);
 const settle=new Settle(),magnet={x:0,y:0,down:true,radius:0};
-let letterSize=200,centre=null,liquidArea=null,magnetOn=false,idleSince=performance.now(),ghost=null,holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+FX.dripMin,assembled=false;
+let letterSize=200,strokeRatio=8,restCalm=0,centre=null,liquidArea=null,magnetOn=false,idleSince=performance.now(),ghost=null,holdTimer=0,burstUntil=0,drip=null,nextDrip=performance.now()+FX.dripMin,assembled=false;
 function updateStatus(){
  $('pause').setAttribute('aria-pressed',String(paused));$('pauseLabel').textContent=paused?'Fortsetzen':'Pause';$('pauseIcon').textContent=paused?'▶':'Ⅱ';
  $('status').textContent=failed?'GRAFIK PAUSIERT':paused?'PHYSICS PAUSED':'LIVE PHYSICS';$('statusDot').classList.toggle('paused',paused||failed);
@@ -36,22 +40,22 @@ function setParameter(name,value){
 }
 controls.forEach(name=>{$(name).addEventListener('input',e=>setParameter(name,e.target.value));setParameter(name,$(name).value);});
 function maskPoints(text,width,height){
- if(!text.trim()){const blank=document.createElement('canvas');blank.width=blank.height=1;renderer?.setMaterial(blank);return{points:[],spacing:5,size:letterSize};}
+ if(!text.trim()){const blank=document.createElement('canvas');blank.width=blank.height=1;renderer?.setMaterial(blank);return{points:[],spacing:5,size:letterSize,stroke:0};}
  const ctx=document.createElement('canvas').getContext('2d');
  let size=Math.min(height*.63,width*.7,330);ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
  const measured=ctx.measureText(text).width;size*=Math.min(1,width*.86/Math.max(1,measured));ctx.font=`500 ${size}px Georgia, 'Times New Roman', serif`;
  const m=ctx.measureText(text),font=ctx.font,baseline=height/2+(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2;
- const {points,spacing,material}=sampleGlyphs(width,height,g=>{g.font=font;g.textAlign='center';g.fillStyle='black';g.fillText(text,width/2,baseline);},Math.round((width<700?2200:4200)*(quality?.particles??1)));
- renderer?.setMaterial(material);
- return {points,spacing,size};
+ const sample=sampleGlyphs(width,height,g=>{g.font=font;g.textAlign='center';g.fillStyle='black';g.fillText(text,width/2,baseline);},Math.round((width<700?2200:4200)*(quality?.particles??1)));
+ renderer?.setMaterial(sample.material);
+ return {points:sample.points,spacing:sample.spacing,size,stroke:sample.stroke};
 }
 function setText(value,animate=true){
  input.value=Array.from(value).slice(0,32).join('');const text=input.value;
  $('charCount').textContent=Array.from(text).length+' / 32';$('fallbackText').textContent=text;
  $('emptyNote').hidden=!!text.trim();canvas.setAttribute('aria-label',`Flüssige Schrift ${text||'– leer'}. Mit Maus oder Finger ziehen. Mit Pfeiltasten Wellen erzeugen.`);
  if(!w||!h)return;
- const old=fluid;const {points,spacing,size}=maskPoints(text,w,h);fluid=new Fluid(points,w,h,spacing);
- measureText(points,size);drip=null;burstUntil=0;idleSince=performance.now();
+ const old=fluid;const {points,spacing,size,stroke}=maskPoints(text,w,h);fluid=new Fluid(points,w,h,spacing);
+ measureText(points,size);strokeRatio=stroke?stroke/spacing:8;drip=null;burstUntil=0;idleSince=performance.now();
  // Keep a short, bounded morph when typing. Particle count may change independently.
  if(animate&&old?.n&&!paused){
   for(let i=0;i<fluid.n;i++){
@@ -64,6 +68,8 @@ function setText(value,animate=true){
  $('particleCount').textContent=fluid.n.toLocaleString('de-DE')+' PARTICLES';
  draw();
 }
+// Share of the full scroll wave and phone push for the current text size.
+function textScale(){return Math.max(.15,Math.min(1,letterSize/FX.impulseSize));}
 // Where the text is: its size for the drop and the magnet, its centre for
 // the idle hand, and the area over which the magnet works (the ink, widened
 // by half the magnet's reach).
@@ -79,6 +85,13 @@ function draw(){
  if(!renderer||!fluid||failed)return;
  // The pointer's drop melting into the letters is drawn with the liquid.
  renderer.extra=effects.cursor?liquidCursor.solid:null;
+ // Moving liquid draws a free surface that reaches beyond the drops, which
+ // swells thin strokes (few drops across) the most. Their reach shrinks a
+ // little, to 0.85 at two drops per stroke: less would tear moving text into
+ // dust, and lone drops stay visible.
+ const grow=.85+.15*Math.max(0,Math.min(1,(strokeRatio-2)/4));
+ renderer.fine=grow<1?{from:1e4,to:1e4+1,grow,amp:1}:{from:0,to:0,grow:1,amp:1};
+ renderer.calm=restCalm;
  renderer.draw(fluid);
 }
 function showFailure(message){failed=true;canvas.style.visibility='hidden';$('fallback').hidden=false;$('fallbackMessage').textContent=message;cursor.style.display='none';updateStatus();}
@@ -159,8 +172,8 @@ window.addEventListener('scroll',()=>{
  const rect=canvas.getBoundingClientRect();if(rect.bottom<0||rect.top>innerHeight)return;
  idleSince=performance.now();
  for(let i=0;i<fluid.n;i++){
-  fluid.vy[i]=Math.max(-1100,Math.min(1100,fluid.vy[i]-delta*3.2*parameters.strength*(.65+.35*Math.sin(fluid.tx[i]/w*Math.PI))));
-  fluid.vx[i]+=Math.sin(fluid.tx[i]*.022)*delta*.18;
+  fluid.vy[i]=Math.max(-1100,Math.min(1100,fluid.vy[i]-delta*3.2*parameters.strength*textScale()*(.65+.35*Math.sin(fluid.tx[i]/w*Math.PI))));
+  fluid.vx[i]+=Math.sin(fluid.tx[i]*.022)*delta*.18*textScale();
  }
 },{passive:true});
 new ResizeObserver(()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{try{resize();}catch{showFailure('Die Grafik konnte nicht angepasst werden. Bitte lade die Ansicht neu.');}},100);}).observe(wrap);
@@ -186,6 +199,11 @@ function frame(t){
   const tick=1/120;
   fluid.step(tick,prm,brush);accumulator-=tick;
  }
+ // Nearly at rest, leftover jitter no longer counts for the look, so the
+ // text returns to crisp type instead of lingering as swollen liquid; real
+ // displacement still draws as liquid.
+ const still=1-Math.max(0,Math.min(1,(meanSpeed(fluid)-12)/48));
+ restCalm+=(still-restCalm)*Math.min(1,dt*8);
  liquidCursor.sync(t);
  draw();
  quality?.frame(interval,performance.now()-work);
@@ -243,8 +261,9 @@ function onMotion(e){
  if(!r)return;
  if(!motion.active){motion.active=true;clearTimeout(motion.waiting);note();}
  if(r.first)return;
- if(r.aligned&&fluid&&!paused&&!document.hidden&&Math.hypot(r.nudge.x,r.nudge.y)>1.5){fluid.nudge(r.nudge.x,r.nudge.y);idleSince=now;}
- parameters.gravityX=r.aligned?r.lean.x:0;parameters.gravityY=r.aligned?r.lean.y:0;
+ const k=textScale(),dx=r.nudge.x*k,dy=r.nudge.y*k;
+ if(r.aligned&&fluid&&!paused&&!document.hidden&&Math.hypot(dx,dy)>1.5){fluid.nudge(dx,dy);idleSince=now;}
+ parameters.gravityX=r.aligned?r.lean.x*k:0;parameters.gravityY=r.aligned?r.lean.y*k:0;
 }
 // Without fresh sensor data the lean must not linger.
 function settleMotion(t){if(motion.reader.last&&t-motion.reader.last>300)parameters.gravityX=parameters.gravityY=0;}
@@ -305,7 +324,7 @@ if(motionPossible&&!motionNeedsAsking&&!reduced.matches){
  motion.waiting=setTimeout(()=>{if(!motion.active)setEffect('motion',false);},2500);
 }
 // With ?debug the running simulation is reachable from the console.
-if(new URLSearchParams(location.search).has('debug'))window.liquidType={get fluid(){return fluid;},get renderer(){return renderer;},get parameters(){return parameters;},get effects(){return effects;},get cursor(){return liquidCursor.chain;},get drip(){return drip;},get motion(){return motion;},setEffect};
+if(new URLSearchParams(location.search).has('debug'))window.liquidType={get fluid(){return fluid;},get renderer(){return renderer;},get parameters(){return parameters;},get effects(){return effects;},get cursor(){return liquidCursor.chain;},get drip(){return drip;},get motion(){return motion;},get strokeRatio(){return strokeRatio;},get letterSize(){return letterSize;},setEffect};
 
 setup();updateStatus();requestAnimationFrame(frame);
 // Expose the same visible controls to compatible browsers; no network or storage.
