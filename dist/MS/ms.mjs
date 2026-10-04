@@ -1,13 +1,13 @@
 // Matthias Sütterlin study: the initials M and S run on the Liquid Type engine.
-import {Fluid} from '../physics.mjs?v=e9996cf8';
-import {FluidRenderer} from '../render.mjs?v=e9996cf8';
-import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=e9996cf8';
-import {matchPoints} from './match.mjs?v=e9996cf8';
-import {restrain,sagWeight} from './coupling.mjs?v=e9996cf8';
-import {createQuality} from '../quality.mjs?v=e9996cf8';
-import {MotionReader} from '../sensors.mjs?v=e9996cf8';
-import {LiquidCursor} from '../cursor.mjs?v=e9996cf8';
-import {scatterAround,burstFrom,isCalm,dripIndices,Settle,idleHand} from '../effects.mjs?v=e9996cf8';
+import {Fluid} from '../physics.mjs?v=bbd22bbf';
+import {FluidRenderer} from '../render.mjs?v=bbd22bbf';
+import {sampleGlyphs,glyphMaterial,glyphLattice,glyphRaster,rasterLattice} from '../glyphs.mjs?v=bbd22bbf';
+import {matchPoints} from './match.mjs?v=bbd22bbf';
+import {restrain,sagWeight} from './coupling.mjs?v=bbd22bbf';
+import {createQuality} from '../quality.mjs?v=bbd22bbf';
+import {MotionReader} from '../sensors.mjs?v=bbd22bbf';
+import {LiquidCursor} from '../cursor.mjs?v=bbd22bbf';
+import {scatterAround,burstFrom,isCalm,dripIndices,Settle,idleHand} from '../effects.mjs?v=bbd22bbf';
 
 const $=id=>document.getElementById(id);
 const home=$('home'),canvas=$('liquid'),initials=$('initials'),back=$('back'),crumb=$('crumb'),hint=$('hint'),hintText=$('hintText'),motionButton=$('motionButton');
@@ -16,7 +16,7 @@ const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 // The sweet spot: heavy and cohesive, but still alive. Viscosity below
 // honey so waves, drips and bursts settle within a couple of seconds.
 const parameters={viscosity:.55,tension:.7,attraction:.85,strength:1.8,gravityX:0,gravityY:0,dripGravity:1400};
-const pointer={x:0,y:0,down:false,radius:80,id:null,last:0,startX:0,startY:0,dragged:false,burst:false,cx:0,cy:0};
+const pointer={x:0,y:0,down:false,radius:80,id:null,type:'',last:0,startX:0,startY:0,dragged:false,burst:false,cx:0,cy:0,since:0};
 // Every effect's dials. Adjustable live from the tuning panel (bottom left)
 // and remembered in this browser; `defaults` restores them.
 const defaults={
@@ -200,6 +200,7 @@ function burst(x,y){
  if(!reducedMotion.matches){fluid.free.fill(1);burstUntil=now+tune.burstFreeMs;drip=null;}
  // The liquid flies free, but the press goes on (see pressAgain).
  pointer.down=false;pointer.dragged=true;pointer.burst=true;pointer.startX=pointer.cx;pointer.startY=pointer.cy;suppressClickUntil=now+600;idleSince=now;
+ notePress('platzt');
  settleFor(tune.burstFreeMs+2600,{homing:2.5});
  try{navigator.vibrate?.(20);}catch{/* optional */}
 }
@@ -241,8 +242,9 @@ function disturb(x,y,dx,dy,radius){if(fluid&&Math.abs(dx)+Math.abs(dy)>=.1)fluid
 home.addEventListener('pointerdown',e=>{
  if(!fluid||transition||pointer.id!==null||e.button>0||e.target.closest('a, .link, .line-hit, .motion-pill'))return;
  const p=local(e);
- Object.assign(pointer,{x:p.x,y:p.y,cx:e.clientX,cy:e.clientY,id:e.pointerId,last:performance.now(),burst:false});
+ Object.assign(pointer,{x:p.x,y:p.y,cx:e.clientX,cy:e.clientY,id:e.pointerId,type:e.pointerType,last:performance.now(),burst:false});
  idleSince=performance.now();magnetOn=false;
+ notePress('drücken',true);
  pressAgain(false);
 });
 // A press holds the liquid under the pointer; held still for holdMs, it
@@ -250,23 +252,34 @@ home.addEventListener('pointerdown',e=>{
 // liquid again at once (`dragging`), and holding still until the letters
 // are back starts a fresh press, so holding on bursts them again.
 function pressAgain(dragging){
- Object.assign(pointer,{down:true,dragged:dragging,startX:pointer.cx,startY:pointer.cy});
+ Object.assign(pointer,{down:true,dragged:dragging,startX:pointer.cx,startY:pointer.cy,since:performance.now()});
  clearTimeout(holdTimer);
  if(!dragging)holdTimer=setTimeout(()=>{if(pointer.down&&!pointer.dragged)burst(pointer.x,pointer.y);},tune.holdMs);
 }
-home.addEventListener('contextmenu',e=>{if(e.target.closest('.initial, .liquid'))e.preventDefault();});
+// Phones have a long press of their own (about 400 ms on Android): a context
+// menu, or the browser taking the touch over with pointercancel. It may come
+// before holdMs and would swallow the hold, so a finger held still for most
+// of holdMs bursts right then.
+function longPress(){
+ if(!pointer.down||pointer.dragged||pointer.type==='mouse'||performance.now()-pointer.since<tune.holdMs*.6)return;
+ clearTimeout(holdTimer);burst(pointer.x,pointer.y);
+}
+home.addEventListener('contextmenu',e=>{
+ if(e.target.closest('.initial, .liquid')||pointer.id!==null)e.preventDefault();
+ if(pointer.id!==null){notePress('menü');longPress();}
+});
 window.addEventListener('pointermove',e=>{
  if(!fluid||!isHome()||transition||(pointer.id!==null&&e.pointerId!==pointer.id)||(!pointer.down&&e.target?.closest?.('.tune, .tune-toggle')))return;
  if(pointer.id!==null&&e.pointerType==='mouse'&&e.buttons===0)release(e);
  const p=local(e),now=performance.now();
  if(pointer.id!==null){pointer.cx=e.clientX;pointer.cy=e.clientY;}
- if(pointer.burst&&pointer.id!==null&&!pointer.down&&Math.hypot(e.clientX-pointer.startX,e.clientY-pointer.startY)>8)pressAgain(true);
+ if(pointer.burst&&pointer.id!==null&&!pointer.down&&Math.hypot(e.clientX-pointer.startX,e.clientY-pointer.startY)>8){notePress('zieht');pressAgain(true);}
  if(pointer.last){
   const dx=p.x-pointer.x,dy=p.y-pointer.y;
   if(pointer.down)disturb(p.x,p.y,dx*16*parameters.strength,dy*16*parameters.strength,pointer.radius);
   else if(e.pointerType==='mouse'&&Math.hypot(dx,dy)<100)disturb(p.x,p.y,dx*2.5*parameters.strength,dy*2.5*parameters.strength,pointer.radius*.65);
  }
- if(pointer.down&&!pointer.dragged&&Math.hypot(e.clientX-pointer.startX,e.clientY-pointer.startY)>8){pointer.dragged=true;clearTimeout(holdTimer);}
+ if(pointer.down&&!pointer.dragged&&Math.hypot(e.clientX-pointer.startX,e.clientY-pointer.startY)>8){pointer.dragged=true;clearTimeout(holdTimer);notePress('zieht');}
  magnetOn=!pointer.down&&e.pointerType==='mouse'&&!!liquidArea&&p.x>liquidArea.left&&p.x<liquidArea.right&&p.y>liquidArea.top&&p.y<liquidArea.bottom;
  magnet.x=p.x;magnet.y=p.y;
  pointer.x=p.x;pointer.y=p.y;pointer.last=now;idleSince=now;
@@ -275,10 +288,11 @@ function release(e){
  if(pointer.id===null||(e&&e.pointerId!==pointer.id))return;
  // A drag or a burst that ends on a letter must not also open "Über mich".
  if(pointer.dragged||pointer.burst)suppressClickUntil=Math.max(suppressClickUntil,performance.now()+400);
+ notePress({pointerup:'los',pointercancel:'abbruch'}[e?.type]||'ende');
  clearTimeout(holdTimer);pointer.down=false;pointer.id=null;pointer.dragged=false;pointer.burst=false;
 }
 window.addEventListener('pointerup',release);
-window.addEventListener('pointercancel',release);
+window.addEventListener('pointercancel',e=>{if(e.pointerId===pointer.id)longPress();release(e);});
 document.documentElement.addEventListener('pointerleave',()=>{if(!pointer.down)pointer.last=0;magnetOn=false;});
 initials.addEventListener('click',e=>{if(performance.now()<suppressClickUntil){e.stopPropagation();e.preventDefault();}},true);
 // Arrow keys on a focused letter send a wave through the liquid.
@@ -358,6 +372,14 @@ const screenAngle=()=>screen.orientation?.angle??window.orientation??0;
 const relearnUpright=()=>motion.reader.relearn();
 screen.orientation?.addEventListener?.('change',relearnUpright);window.addEventListener('orientationchange',relearnUpright);
 const debug=new URLSearchParams(location.search).has('debug')?Object.assign(document.body.appendChild(document.createElement('pre')),{className:'debug'}):null;
+// ?debug also lists what the last press went through, in ms since it began.
+const pressDebug=debug?Object.assign(document.body.appendChild(document.createElement('pre')),{className:'debug debug-press'}):null,pressLog={start:0,items:[]};
+function notePress(what,first=false){
+ if(!pressDebug)return;
+ const now=performance.now();if(first){pressLog.start=now;pressLog.items=[];}
+ pressLog.items.push(`${what} ${Math.round(now-pressLog.start)}`);
+ pressDebug.textContent='druck: '+pressLog.items.slice(-8).join(' · ');
+}
 // With ?debug the running simulation is reachable from the console for tuning.
 if(debug)window.liquidType={get fluid(){return fluid;},get drip(){return drip;},get parameters(){return parameters;},get motion(){return motion;},get renderer(){return renderer;},get transition(){return transition;},get quality(){return quality;},get cursor(){return liquidCursor.chain;}};
 function onMotion(e){
