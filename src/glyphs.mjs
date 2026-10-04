@@ -89,5 +89,7 @@ export function sampleGlyphs(width,height,draw,budget){
   points=latticeScan(rgba,c.width,0,0,0,0,width,height,spacing,0);
   if(points.length<=budget)break;spacing*=Math.sqrt(points.length/budget)*1.03;
  }
- return {points,spacing,material};
+ // Mean stroke width in px, measured only when asked for.
+ let stroke=null;
+ return {points,spacing,material,get stroke(){return stroke??=strokeWidth(rgba,c.width,c.height);}};
 }

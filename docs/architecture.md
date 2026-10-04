@@ -50,6 +50,14 @@ Die Effekte der MS-Seite liegen in gemeinsamen Modulen, damit Hauptseite und MS-
 
 Die Offline-Einzeldateien legen alle Module in eine Funktion und entfernen die `import`-Zeilen. Ein Name auf oberster Ebene darf deshalb nur einmal vorkommen; eine zweite gleichnamige Funktion würde die erste stillschweigend ersetzen. Ein Buildtest prüft das für `Liquid-Type-Offline.html`. Aus diesem Grund heißen die Shader-Quelltexte im Renderer `pointVertex`, `dropFragment`, `screenVertex` und `surfaceFragment`: Ein früheres `screen` überdeckte dort `window.screen`, sodass die Offline-Datei die Bildschirmdrehung für die Sensoren nicht erkannte.
 
+## Kleine Schrift in Bewegung (Hauptseite)
+
+Bewegte Flüssigkeit zeichnet der Renderer als freie Oberfläche, die rund anderthalb Partikelabstände über die äußeren Tropfen hinausreicht; erst fast in Ruhe zeigt er wieder die scharfe Schrift. Bei großer, kräftiger Schrift fällt das kaum auf. Kleine, dünne Schrift am Handy (etwa „Welcome Babsi“ in 42 px, nur 1,6 Partikel je Strich) wurde dadurch in Bewegung bis zu 2,6-mal so fett, und weil schon ein Nachzittern von etwa 9 px/s als Bewegung zählt, blieb sie nach einer Scroll-Welle sekundenlang verschmiert. Drei Maßnahmen im Generator:
+
+- Scroll-Welle und Handy-Schübe wirken im Verhältnis zur Schriftgröße, voll ab 240 px (`FX.impulseSize`), mindestens 15 Prozent. Ein Wisch am Handy wirft „Welcome Babsi“ nun etwa 40 statt 220 px aus der Form.
+- Kommt die Flüssigkeit im Mittel fast zur Ruhe (unter etwa 12 bis 60 px/s), steigt `renderer.calm`: Restzittern zählt dann nicht mehr für den Look, echte Auslenkung schon. Nach einer Welle steht die Schrift so nach rund drei Sekunden wieder scharf.
+- `sampleGlyphs` misst bei Bedarf die Strichstärke (`stroke`). Bei wenigen Partikeln je Strich sinkt die Reichweite bewegter Tropfen leicht (`renderer.fine`, bis 0,85 bei zwei Partikeln je Strich). Kürzere Reichweiten oder eine feinere Abtastung lassen bewegte Schrift in Staub zerfallen und wurden deshalb verworfen.
+
 ## Schwache und ältere Geräte
 
 `quality.mjs` führt auf beiden Seiten zwei Regler. Der eine begrenzt die Zeichenauflösung (2, 1,5, 1 oder 0,75 Gerätepixel je CSS-Pixel) und entlastet schwache Grafikchips. Der andere senkt den Anteil der Partikel (100, 80, 62 oder 48 Prozent) und entlastet schwache Prozessoren. Die Pixelzahl ist der stärkste Hebel, denn jeder Bildpunkt der Flüssigkeit wird von rund 14 Tropfen gezeichnet, unabhängig von ihrer Zahl. Weniger Partikel sparen dagegen Rechenzeit in der Physik.

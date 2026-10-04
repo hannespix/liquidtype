@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Fluid} from '../src/physics.mjs';
-import {scatterAround,burstFrom,isCalm,dripIndices,Settle,idleHand} from '../src/effects.mjs';
+import {scatterAround,burstFrom,isCalm,meanSpeed,dripIndices,Settle,idleHand} from '../src/effects.mjs';
 
 // A block of liquid 20 × 10 drops, 6 px apart, in a 400 × 300 canvas.
 const block=()=>{const points=[];for(let y=0;y<10;y++)for(let x=0;x<20;x++)points.push({x:140+x*6,y:120+y*6});return new Fluid(points,400,300,6);};
@@ -30,6 +30,7 @@ test('a burst sends the drops away from the press point, the near ones faster',(
  }
  assert.ok(near/nn>far/nf,'faster near the press point');
  assert.equal(isCalm(f),false);f.vx.fill(0);f.vy.fill(0);assert.equal(isCalm(f),true);
+ f.vx.fill(30);assert.equal(meanSpeed(f),30);assert.equal(isCalm(f,25),false);assert.equal(meanSpeed(new Fluid([],10,10,6)),0);
 });
 
 test('a drip takes a drop of particles from the lowest edge',()=>{
